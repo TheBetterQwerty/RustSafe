@@ -1,5 +1,6 @@
 use serde::{Serialize, Deserialize};
 use std::io::{self, Write};
+use std::fs;
 use hex::{encode, decode};
 use sha2::{Sha512, Digest};
 use rand::random;
@@ -67,10 +68,6 @@ impl Record {
         }
     }
 
-    pub fn calculate_hmac(&mut self, data: String) {
-        self.hmac.push_str(&hash512(data)); // data is all the fields decryted + key
-    }
-
     pub fn decrypt_record(&self, key: &str) -> Self {
         let nonce = decode(&self.salt).unwrap();
         let mut calc_hash = String::new();
@@ -108,7 +105,8 @@ impl Record {
         };
         
         calc_hash.push_str(key);
-
+        
+        /* Condition will be true work if password is changed */
         if hash512(calc_hash) != self.hmac {
             panic!("[!] Hashes doesnt match!");
         }
@@ -122,11 +120,58 @@ impl Record {
             hmac: self.hmac.clone(),
         }
     }
+
+    pub fn load(path: &str, key: &str) -> Vec<Record> {
+        let data: String = match fs::read_to_string(path) {
+            Ok(x) => x,
+            Err(x) => panic!("[!] Error {x}"),
+        };
+
+        let records: Vec<Record> = match serde_json::from_str(&data) {
+            Ok(x) => x,
+            Err(x) => panic!("[!] Error {x}"),
+        };
+        
+        /* Decrypt the records */
+        let mut decrypted_records: Vec<Record> = Vec::new();
+        for record in records {
+            // key = nonce[..12] + key + nonce[12..]
+            let mut new_key: String = String::new();
+            new_key.push_str(&record.salt[..12]);
+            new_key.push_str(key);
+            new_key.push_str(&record.salt[12..]);
+            decrypted_records.push(record.decrypt_record(&new_key));
+        }
+
+        decrypted_records
+    }
+
+    pub fn dump(records: &[Record], path: &str, key: &str) {
+        let mut encrypted_records: Vec<Record> = Vec::new();
+        for record in records {
+            // key = nonce[..12] + key + nonce[12..]
+            let mut new_key: String = String::new();
+            new_key.push_str(&record.salt[..12]);
+            new_key.push_str(key);
+            new_key.push_str(&record.salt[12..]);
+            encrypted_records.push((*record).encrypt_record(&new_key));
+        }
+
+        let encoded = match serde_json::to_string_pretty(&encrypted_records) {
+            Ok(x) => x,
+            Err(x) => panic!("[!] Error {x}"),
+        };
+
+        match fs::write(path, encoded.as_bytes()) {
+            Ok(()) => {},
+            Err(x) => panic!("[!] Error {x}"),
+        }
+    }
 }
 
 pub fn fgets() -> String {
     let mut input = String::new();
-    io::stdout().flush();
+    let _ = io::stdout().flush();
     io::stdin().read_line(&mut input).expect("[!] Error reading from stdin!");
     
     return input.trim().to_owned();
