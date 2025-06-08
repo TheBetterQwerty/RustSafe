@@ -1,8 +1,10 @@
+#![allow(dead_code)]
+
 use serde::{Serialize, Deserialize};
 use std::io::{self, Write};
 use std::fs;
 use hex::{encode, decode};
-use sha2::{Sha512, Digest};
+use sha2::{Sha256, Digest};
 use rand::random;
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -19,6 +21,7 @@ pub struct Record {
     hmac: String,
 }
 
+
 impl Record {
     pub fn new(data: [String; 4], key: &str) -> Self {
         let bytes: Vec<u8> = (0..12).map(|_| { random::<u8>() }).collect();
@@ -31,7 +34,7 @@ impl Record {
             password: data[1].clone(),
             email: data[2].clone(),
             note: data[3].clone(),
-            hmac: hash512(calc_hash),
+            hmac: hash256(calc_hash),
         }
     }
 
@@ -106,8 +109,14 @@ impl Record {
         
         calc_hash.push_str(key);
         
-        /* Condition will be true work if password is changed */
-        if hash512(calc_hash) != self.hmac {
+        /* 
+         * Condition will be true work if password is changed 
+         * That is when change_database_password() function in implemented 
+         * this will panic so in change_database_password() function change all 
+         * the hmac of each records
+         *
+         * */
+        if hash256(calc_hash) != self.hmac {
             panic!("[!] Hashes doesnt match!");
         }
 
@@ -135,12 +144,12 @@ impl Record {
         /* Decrypt the records */
         let mut decrypted_records: Vec<Record> = Vec::new();
         for record in records {
-            // key = nonce[..12] + key + nonce[12..]
+            // key = hash(nonce[..12] + key + nonce[12..])
             let mut new_key: String = String::new();
             new_key.push_str(&record.salt[..12]);
             new_key.push_str(key);
             new_key.push_str(&record.salt[12..]);
-            decrypted_records.push(record.decrypt_record(&new_key));
+            decrypted_records.push(record.decrypt_record(&hash256(new_key)));
         }
 
         decrypted_records
@@ -149,12 +158,12 @@ impl Record {
     pub fn dump(records: &[Record], path: &str, key: &str) {
         let mut encrypted_records: Vec<Record> = Vec::new();
         for record in records {
-            // key = nonce[..12] + key + nonce[12..]
+            // key = hash(nonce[..12] + key + nonce[12..])
             let mut new_key: String = String::new();
             new_key.push_str(&record.salt[..12]);
             new_key.push_str(key);
             new_key.push_str(&record.salt[12..]);
-            encrypted_records.push((*record).encrypt_record(&new_key));
+            encrypted_records.push((*record).encrypt_record(&hash256(new_key)));
         }
 
         let encoded = match serde_json::to_string_pretty(&encrypted_records) {
@@ -177,8 +186,8 @@ pub fn fgets() -> String {
     return input.trim().to_owned();
 }
 
-pub fn hash512(text: String) -> String {
-    let res = Sha512::digest(text.as_bytes());
+fn hash256(text: String) -> String {
+    let res = Sha256::digest(text.as_bytes());
     return encode(res);
 }
 
@@ -190,7 +199,7 @@ fn encrypt(key: &str, plaintext: &String, nonce: &[u8]) -> Result<String, String
     let ciphertext = match cipher.encrypt(nonce, (*plaintext).as_bytes()) {
         Ok(x) => x,
         Err(x) => {
-            return Err(format!("[!] Error encrypting message: {}", x).to_owned());
+            return Err(format!("[!] Error encrypting message: {}", x));
         },
     };
 
@@ -204,7 +213,7 @@ fn decrypt(key: &str, ciphertext: &String, nonce: &[u8]) -> Result<String, Strin
     let ciphertext = match decode(ciphertext) {
         Ok(x) => x,
         Err(x) => {
-            return Err(format!("[!] Error: {x}").to_string());
+            return Err(format!("[!] Error: {x}"));
         },
     };
 
