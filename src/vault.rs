@@ -16,31 +16,36 @@ pub struct Record {
     salt: String,
     username: String,
     password: String,
-    email: String,
-    note: String,
+    email: Option<String>,
+    note: Option<String>,
     hmac: String,
 }
 
 
 impl Record {
     pub fn new(data: [String; 4], key: &str) -> Self {
+        /* takes the fields in the arr and then joins the stuff which are not empty
+         * HMAC calculation
+         *     L-> concated all the non-empty fields and then add key to the last THEN hash256
+         * */
         let bytes: Vec<u8> = (0..12).map(|_| { random::<u8>() }).collect();
-        let mut calc_hash: String = data.join("");
+        let mut calc_hash: String = data.iter().filter(|x| !x.is_empty()).collect()::<Vec<_>>().join("\n");
         calc_hash.push_str(key);
 
         Record {
             salt: encode(bytes),
             username: data[0].clone(),
             password: data[1].clone(),
-            email: data[2].clone(),
-            note: data[3].clone(),
+            email: if data[2].is_empty() { None } else { Some(data[2].clone()) },
+            note: if data[3].is_empty() { None } else { Some(data[3].clone()) },
             hmac: hash256(calc_hash),
         }
     }
 
     pub fn encrypt_record(&self, key: &str) -> Self {
         let nonce = decode(&self.salt).unwrap();
-        
+        let (mut email, mut note): (Option<String>, Option<String>) = (None, None);
+
         let username = match encrypt(key, &self.username, &nonce) {
             Ok(x) => x,
             Err(x) => panic!("{x}"),
@@ -50,16 +55,20 @@ impl Record {
             Ok(x) => x,
             Err(x) => panic!("{x}"),
         };
-
-        let email = match encrypt(key, &self.email, &nonce) {
-            Ok(x) => x,
-            Err(x) => panic!("{x}"),
-        };
-
-        let note = match encrypt(key, &self.note, &nonce) {
-            Ok(x) => x,
-            Err(x) => panic!("{x}"),
-        };
+        
+        if let Some(_email) = &self.email {
+            email = match encrypt(key, &_email, &nonce) {
+                Ok(x) => Some(x),
+                Err(x) => panic!("{x}"),
+            };
+        }
+        
+        if let Some(_note) = &self.note {
+            note = match encrypt(key, &_note, &nonce) {
+                Ok(x) => Some(x),
+                Err(x) => panic!("{x}"),
+            };
+        }
 
         Record {
             salt: self.salt.clone(),
@@ -67,13 +76,15 @@ impl Record {
             password,
             email,
             note,
-            hmac: self.hmac.clone(),
+            hmac: self.hmac.clone(), // same hmac 
         }
     }
 
     pub fn decrypt_record(&self, key: &str) -> Self {
         let nonce = decode(&self.salt).unwrap();
         let mut calc_hash = String::new();
+        let (mut email, mut note): (Option<String>, Option<String>) = (None, None);
+
 
         let username = match decrypt(key, &self.username, &nonce) {
             Ok(x) => { 
@@ -90,22 +101,26 @@ impl Record {
             },
             Err(x) => panic!("{x}"),
         };
-
-        let email = match decrypt(key, &self.email, &nonce) {
-            Ok(x) => { 
-                calc_hash.push_str(&x);
-                x
-            },
-            Err(x) => panic!("{x}"),
-        };
-
-        let note = match decrypt(key, &self.note, &nonce) {
-            Ok(x) => { 
-                calc_hash.push_str(&x);
-                x
-            },           
-            Err(x) => panic!("{x}"),
-        };
+        
+        if let Some(_email) = &self.email {
+            email = match decrypt(key, &_email, &nonce) {
+                Ok(x) => { 
+                    calc_hash.push_str(&x);
+                    Some(x)
+                },
+                Err(x) => panic!("{x}"),
+            };
+        }
+        
+        if let Some(_note) = &self.note {
+            note = match decrypt(key, &_note, &nonce) {
+                Ok(x) => { 
+                    calc_hash.push_str(&x);
+                    Some(x)
+                },           
+                Err(x) => panic!("{x}"),
+            };
+        }
         
         calc_hash.push_str(key);
         
@@ -131,6 +146,7 @@ impl Record {
     }
 
     pub fn load(path: &str, key: &str) -> Option<Vec<Record>> {
+        // TODO: hardcode the path to the passworfile 
         let data: String = match fs::read_to_string(path) {
             Ok(x) => x,
             Err(x) => panic!("[!] Error {x}"),
