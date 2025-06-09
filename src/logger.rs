@@ -1,13 +1,16 @@
 #![allow(dead_code)]
 
+/* IMPORTS */
 use std::fs::{File, OpenOptions};
 use std::sync::Mutex;
 use std::io::{Seek, SeekFrom, Write, Read};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/* GLOBAL VAR'S */
 static LOGGER: Mutex<Option<File>> = Mutex::new(None);
 const SIZE: usize = 300;
 const BAN: &str = "You are banned for 5 minutes";
+const BAN_TIME: u128 = 3_00_000; // 5 minutes
 
 pub fn start_logger(path: &str) {
     let file = match OpenOptions::new().read(true).write(true).create(true).open(path) {
@@ -39,14 +42,19 @@ fn check_file_length() {
     }
 }
 
-fn get_current_time() -> SystemTime {
+fn get_current_time() -> u128 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
-        .as_millis();
+        .as_millis()
 }
 
-fn get_elapsed_time() -> Option<u64> {
+/* This function will return the time left until unban 
+ * if it return None that means that last log isnt a BAN log 
+ * OR user's ban time is up
+ * */
+pub fn get_elapsed_time() -> bool {
+    let mut time_left: u128 = 0;
     let mut logger = LOGGER.lock().unwrap();
     if let Some(ref mut file) = *logger {
         let mut data = String::new();
@@ -55,16 +63,21 @@ fn get_elapsed_time() -> Option<u64> {
         let logs: Vec<_> = data.split('\n').collect();
         if let Some(last_log) = logs.last() {
             if !last_log.contains(BAN) {
-                return None;
+                return false;
             }
+            /* 12345667 HELLO WORLD */
+            let arg = last_log.split(' ').nth(0).unwrap(); // [ 12345667 , HELLO , WORLD ]
+            let arg: u128 = arg.parse().expect("[!] Error parsing data!"); // 12345667 -> u128
 
-            let args: Vec<_> = last_log.split(' ').collect();
-            let current_time = get_current_time();
-            
+            time_left = get_current_time() - arg;
         }
     }
+    
+    if time_left < BAN_TIME {
+        return true;
+    }
 
-    Some(0)
+    return false;
 }
 
 #[macro_export]
@@ -73,7 +86,7 @@ macro_rules! log {
         check_file_length(); // checks for length
         let mut logger = LOGGER.lock().unwrap();
         if let Some(file) = *logger {
-            writeln!(file, "{} {}", ,$($arg)*).expect("[!] Error writting to log file!");
+            writeln!(file, "{} {}", get_current_time(), $($arg)*).expect("[!] Error writting to log file!");
         }
     };
 }

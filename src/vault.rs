@@ -130,11 +130,15 @@ impl Record {
         }
     }
 
-    pub fn load(path: &str, key: &str) -> Vec<Record> {
+    pub fn load(path: &str, key: &str) -> Option<Vec<Record>> {
         let data: String = match fs::read_to_string(path) {
             Ok(x) => x,
             Err(x) => panic!("[!] Error {x}"),
         };
+        
+        if data.len() == 0 {
+            return None;
+        }
 
         let records: Vec<Record> = match serde_json::from_str(&data) {
             Ok(x) => x,
@@ -152,7 +156,7 @@ impl Record {
             decrypted_records.push(record.decrypt_record(&hash256(new_key)));
         }
 
-        decrypted_records
+        Some(decrypted_records)
     }
 
     pub fn dump(records: &[Record], path: &str, key: &str) {
