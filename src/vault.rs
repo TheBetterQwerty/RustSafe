@@ -29,7 +29,13 @@ impl Record {
          *     L-> concated all the non-empty fields and then add key to the last THEN hash256
          * */
         let bytes: Vec<u8> = (0..12).map(|_| { random::<u8>() }).collect();
-        let mut calc_hash: String = data.iter().filter(|x| !x.is_empty()).collect()::<Vec<_>>().join("\n");
+        let mut calc_hash: String = data
+            .iter()
+            .filter(|field| !field.is_empty())
+            .cloned()               // &Vec<String> -> Vec<String>
+            .collect::<Vec<String>>()
+            .join("\n");
+
         calc_hash.push_str(key);
 
         Record {
@@ -44,7 +50,7 @@ impl Record {
 
     pub fn encrypt_record(&self, key: &str) -> Self {
         let nonce = decode(&self.salt).unwrap();
-        let (mut email, mut note): (Option<String>, Option<String>) = (None, None);
+        let (mut email, mut note) = (None, None);
 
         let username = match encrypt(key, &self.username, &nonce) {
             Ok(x) => x,
@@ -83,7 +89,7 @@ impl Record {
     pub fn decrypt_record(&self, key: &str) -> Self {
         let nonce = decode(&self.salt).unwrap();
         let mut calc_hash = String::new();
-        let (mut email, mut note): (Option<String>, Option<String>) = (None, None);
+        let (mut email, mut note) = (None, None);
 
 
         let username = match decrypt(key, &self.username, &nonce) {
