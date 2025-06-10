@@ -1,8 +1,12 @@
+#![allow(dead_code)]
+
 use std::fs;
 use std::io;
+use std::io::Write;
 
 mod vault;
 mod logger;
+mod argparse;
 
 const PATH: &str = "/home/qwerty/.rustsafe";
 const PASSWORDFILE: &str = "/home/qwerty/.rustsafe/dump.json";
@@ -10,11 +14,14 @@ const LOGFILE: &str = "/home/qwerty/.rustsafe/log";
 const EXPORT: &str = "/home/qwerty/desktop/main.json";
 
 fn main() {
+    logger::start_logger(LOGFILE);
+
     if !fs::exists(PATH).unwrap() {
         match initialize_database() {
-            Ok(()) => println!("[+] ,"),
+            Ok(()) => println!("[+] Database was created!"),
             Err(x) => panic!("[!] Error: {x}"),
         }
+        log!("Database was created");
         return;
     }
 }

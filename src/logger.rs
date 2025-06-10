@@ -7,7 +7,7 @@ use std::io::{Seek, SeekFrom, Write, Read};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /* GLOBAL VAR'S */
-static LOGGER: Mutex<Option<File>> = Mutex::new(None);
+pub static LOGGER: Mutex<Option<File>> = Mutex::new(None);
 const SIZE: usize = 300;
 const BAN: &str = "You are banned for 5 minutes";
 const BAN_TIME: u128 = 3_00_000; // 5 minutes
@@ -22,7 +22,7 @@ pub fn start_logger(path: &str) {
     *logger = Some(file);
 }
 
-fn check_file_length() {
+pub fn check_file_length() {
     let mut logger = LOGGER.lock().unwrap();
     if let Some(ref mut file) = *logger {
         let mut data: String = String::new();
@@ -42,7 +42,7 @@ fn check_file_length() {
     }
 }
 
-fn get_current_time() -> u128 {
+pub fn get_current_time() -> u128 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -83,10 +83,11 @@ pub fn get_elapsed_time() -> bool {
 #[macro_export]
 macro_rules! log {
     ($($arg:tt)*) => {
-        check_file_length(); // checks for length
-        let mut logger = LOGGER.lock().unwrap();
-        if let Some(file) = *logger {
-            writeln!(file, "{} {}", get_current_time(), $($arg)*).expect("[!] Error writting to log file!");
+        logger::check_file_length(); // checks for length
+        let mut logger = logger::LOGGER.lock().unwrap();
+        if let Some(ref mut file) = *logger {
+            let time = logger::get_current_time();
+            writeln!(file, "{} {}", time, format!($($arg)*)).expect("[!] Error writting to log file!");
         }
     };
 }
