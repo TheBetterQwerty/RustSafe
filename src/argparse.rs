@@ -1,0 +1,83 @@
+use std::env::Args;
+
+pub enum Commands {
+    Init,
+    Unlock,                 // Not for now use
+    Lock,                   // Next update
+    Add(String),            // Add new entry
+    Get(String),            // Get record based on username or email
+    List,                   // Shows all entries
+    Edit(String),           // Edits the entered record based on username or email
+    Delete(String),          // Deletes a entry
+    Generate(u32),          // Generates a password of 'n' size
+    Export,                 // Exports to file
+    Import(String),         // Imports from given path
+    Help,                   // Prints help
+    Invalid(String),        // Invalid password
+}
+
+pub fn parse_args(args: Args) -> Option<Commands> {
+    let mut args = args.skip(1);
+    
+    match args.next().as_deref() {
+        Some("add") => {
+            if let Some(entry) = args.next() {
+                return Some(Commands::Add(entry)); 
+            } else {
+                println!("[?] Missing argument for 'add'");
+            }
+        },
+        Some("list") => {
+            return Some(Commands::List);
+        },
+        Some("rm") => {
+            if let Some(entry) = args.next() {
+                return Some(Commands::Delete(entry));
+            } else {
+                println!("[?] Missing argument for 'rm'");
+            }
+        },
+        Some("generate") => {
+            if let Some(size) = args.next() {
+                let size: u32 = match size.parse() {
+                    Ok(x) => x,
+                    Err(_) => {
+                        println!("[?] Not a valid number!");
+                        return None;
+                    }
+                };
+                return Some(Commands::Generate(size));
+            } else {
+                println!("[?] Missing argument for 'generate'");
+            }
+        },
+        Some(unknown) => helper(Commands::Invalid(unknown.to_string())),
+        None => helper(Commands::Help),
+    }
+
+    None
+}
+
+fn helper(command: Commands) {
+    if let Commands::Invalid(cmd) = command {
+        println!("✘ Unknown command '{}'\nTry 'rustsafe help' for usage.", cmd);
+        return;
+    }
+    
+    if let Commands::Help = command {
+    println!(
+r#"Usage:
+  rustsafe <command> [options]
+
+Commands:
+  add <name>         Add a new password entry
+  get <name>         Retrieve a password
+  list               List all saved entries
+  rm <name>          Remove an entry
+  generate           Generate a secure password
+
+Options:
+  --copy             Copy password to clipboard (used with 'get')"#
+    );
+    }
+}

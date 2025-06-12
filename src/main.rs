@@ -3,6 +3,7 @@
 use std::fs;
 use std::io;
 use std::io::Write;
+use std::env;
 
 mod vault;
 mod logger;
@@ -12,6 +13,8 @@ const PATH: &str = "/home/qwerty/.rustsafe";
 const PASSWORDFILE: &str = "/home/qwerty/.rustsafe/dump.json";
 const LOGFILE: &str = "/home/qwerty/.rustsafe/log";
 const EXPORT: &str = "/home/qwerty/desktop/main.json";
+
+type Commands = argparse::Commands;
 
 fn main() {
     logger::start_logger(LOGFILE);
@@ -24,6 +27,21 @@ fn main() {
         log!("Database was created");
         return;
     }
+    
+    match argparse::parse_args(env::args()) {
+        Some(cmd) => {
+            match cmd {
+                Commands::Add(x) => {
+                    
+                },
+                _ => {},
+            }
+        },
+        None => {
+            return;
+        }
+    };
+    
 }
 
 fn initialize_database() -> io::Result<()> {
@@ -33,15 +51,45 @@ fn initialize_database() -> io::Result<()> {
     Ok(())
 }
 
-fn verify_master_password() {}
-
 fn display_stored_credentials() {}
 
-fn store_new_credential() {
+fn store_new_credential(entry: String) {
+    let mut data: Vec<String> = Vec::with_capacity(5);
     /* load the file 
      * add new record
      * dump
      * */
+    print!("[+] Enter master password: ");
+    let password: String = vault::fgets();
+    
+    print!("[+] Enter username for '{}': ", entry);
+    data.push(vault::fgets());
+    
+    print!("[+] Enter password for '{}' (on empty creates a safe password of length 30) : ", entry);
+    let pass: String = vault::fgets();
+    if pass.is_empty() {
+        data.push(vault::generate_rand_password(30));
+    } else {
+        data.push(pass);
+    }
+
+    print!("[+] Enter email for '{}' (optional): ", entry);
+    data.push(vault::fgets());
+    
+    print!("[+] Enter note for '{}' (optional): ", entry);
+    data.push(vault::fgets());
+
+    let mut records = match vault::load(PASSWORDFILE, &password) {
+        Some(x) => x,
+        None => {
+            println!("[!] Please create the database first!.\nTry 'rustsafe init' to create the database");
+            return;
+        },
+    };
+
+    records.push(vault::Record::new(&data, &password));
+    
+    vault::dump(&records, PASSWORDFILE, &password);
 }
 
 fn update_existing_credential() {
