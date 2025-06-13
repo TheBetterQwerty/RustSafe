@@ -9,7 +9,7 @@ pub enum Commands {
     List,                   // Shows all entries
     Edit(String),           // Edits the entered record based on username or email
     Delete(String),          // Deletes a entry
-    Generate(u32),          // Generates a password of 'n' size
+    Generate(usize),          // Generates a password of 'n' size
     Export,                 // Exports to file
     Import(String),         // Imports from given path
     Help,                   // Prints help
@@ -23,9 +23,8 @@ pub fn parse_args(args: Args) -> Option<Commands> {
         Some("add") => {
             if let Some(entry) = args.next() {
                 return Some(Commands::Add(entry)); 
-            } else {
-                println!("[?] Missing argument for 'add'");
             }
+            println!("[?] Missing argument for 'add'");
         },
         Some("list") => {
             return Some(Commands::List);
@@ -33,13 +32,12 @@ pub fn parse_args(args: Args) -> Option<Commands> {
         Some("rm") => {
             if let Some(entry) = args.next() {
                 return Some(Commands::Delete(entry));
-            } else {
-                println!("[?] Missing argument for 'rm'");
             }
+            println!("[?] Missing argument for 'rm'");
         },
         Some("generate") => {
             if let Some(size) = args.next() {
-                let size: u32 = match size.parse() {
+                let size: usize = match size.parse() {
                     Ok(x) => x,
                     Err(_) => {
                         println!("[?] Not a valid number!");
@@ -47,9 +45,14 @@ pub fn parse_args(args: Args) -> Option<Commands> {
                     }
                 };
                 return Some(Commands::Generate(size));
-            } else {
-                println!("[?] Missing argument for 'generate'");
             }
+            println!("[?] Missing argument for 'generate'");
+        },
+        Some("delete") => {
+            if let Some(entry) = args.next() {
+                return Some(Commands::Delete(entry));
+            }
+            println!("[!] Missing argument for 'delete'");
         },
         Some(unknown) => helper(Commands::Invalid(unknown.to_string())),
         None => helper(Commands::Help),

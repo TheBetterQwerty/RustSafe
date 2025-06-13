@@ -25,22 +25,28 @@ pub struct Record {
 
 impl Record {
     pub fn new(data: &[String], key: &str) -> Self {
-        /* takes the fields in the arr and then joins the stuff which are not empty
-         * HMAC calculation
-         *     L-> concated all the non-empty fields and then add key to the last THEN hash256
+        /* 
+         * HMAC calculation:
+         *  o salt + (fields that are not empty) + key
+         *  o sha256 hash 
+         *
          * */
         let bytes: Vec<u8> = (0..12).map(|_| { random::<u8>() }).collect();
-        let mut calc_hash: String = data
+        let salt = encode(bytes);
+
+        let mut vec = data
             .iter()
             .filter(|field| !field.is_empty())
-            .cloned()               // &Vec<String> -> Vec<String>
-            .collect::<Vec<String>>()
-            .join("\n");
+            .cloned()                                    // &Vec<String> -> Vec<String>
+            .collect::<Vec<String>>();
+        
+        vec.insert(0, salt.clone());
+        vec.push(key.to_string());
+        
+        let calc_hash = vec.join("\n");
 
-        calc_hash.push_str(key);
-    
         Record {
-            salt: encode(bytes),
+            salt,
             entry: data[0].clone(),
             username: data[1].clone(),
             password: data[2].clone(),
@@ -50,7 +56,7 @@ impl Record {
         }
     }
 
-    pub fn encrypt_record(&self, key: &[u8]) -> Self {
+    fn encrypt_record(&self, key: &[u8]) -> Self {
         let nonce = decode(&self.salt).unwrap();
         let (mut email, mut note) = (None, None);
 
@@ -89,7 +95,7 @@ impl Record {
         }
     }
 
-    pub fn decrypt_record(&self, key: &[u8], key_plain: &str) -> Result<Self,String> {
+    fn decrypt_record(&self, key: &[u8], key_plain: &str) -> Result<Self,String> {
         let nonce = decode(&self.salt).unwrap();
         let mut calc_hash = String::from(self.entry.clone());
         let (mut email, mut note) = (None, None);
@@ -153,10 +159,32 @@ impl Record {
             hmac: self.hmac.clone(),
         })
     }
+    
+    // entry username email note
+    pub fn entry(&self) -> String {
+        self.entry.clone()
+    }
+
+    pub fn username(&self) -> String {
+        self.username.clone()
+    }
+
+    pub fn password(&self) -> String {
+        self.password.clone()
+    }
+
+    pub fn email(&self) -> Option<String> {
+        self.email.clone()
+    }
+
+    pub fn note(&self) -> Option<String> {
+        self.note.clone()
+    }
 }
 
 pub fn load(path: &str, key: &str) -> Option<Vec<Record>> {
     // TODO: hardcode the path to the passworfile 
+    // TODO: send the result too to log and give ban
     let data: String = match fs::read_to_string(path) {
         Ok(x) => x,
         Err(x) => panic!("[!] Error {x}"),
@@ -230,9 +258,9 @@ pub fn fgets() -> String {
 
 fn hash256(text: String) -> [u8; 32] { 
     let res = Sha256::digest(text.as_bytes());
-    let mut a = [0u8; 32];
-    a.copy_from_slice(&res);
-    a
+    let mut bytes = [0u8; 32];
+    bytes.copy_from_slice(&res);
+    bytes
 }
 
 fn encrypt(key: &[u8], plaintext: &String, nonce: &[u8]) -> Result<String, String> {
