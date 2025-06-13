@@ -160,6 +160,18 @@ impl Record {
         })
     }
     
+    pub fn pretty_print(&self) {
+        println!("|{:_^size$}|", self.entry, size = self.entry.len() + 10);
+        println!(" Entry: {}", self.username);
+        if let Some(email) = &self.email {
+            println!(" Email: {}", *email);
+        }
+        println!(" Password: {}", self.password);
+        if let Some(note) = &self.note {
+            println!(" Note: {}", *note);
+        }
+    }
+
     // entry username email note
     pub fn entry(&self) -> String {
         self.entry.clone()
@@ -183,7 +195,6 @@ impl Record {
 }
 
 pub fn load(path: &str, key: &str) -> Option<Vec<Record>> {
-    // TODO: hardcode the path to the passworfile 
     // TODO: send the result too to log and give ban
     let data: String = match fs::read_to_string(path) {
         Ok(x) => x,
@@ -223,6 +234,7 @@ pub fn load(path: &str, key: &str) -> Option<Vec<Record>> {
 
 pub fn dump(records: &[Record], path: &str, key: &str) {
     let mut encrypted_records: Vec<Record> = Vec::new();
+
     for record in records {
         // key = hash(nonce[..12] + key + nonce[12..])
         let mut new_key: String = String::new();

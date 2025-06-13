@@ -1,9 +1,4 @@
-#![allow(dead_code)]
-
-use std::fs;
-use std::io;
-use std::io::Write;
-use std::env;
+use std::{fs, io::{self, Write}, env};
 
 mod vault;
 mod logger;
@@ -16,16 +11,14 @@ const EXPORT: &str = "/home/qwerty/desktop/main.json";
 
 type Commands = argparse::Commands;
 
-// Add a display record function in vault that must pretty print Record
-
 fn main() {
-    logger::start_logger(LOGFILE);
-
     if !fs::exists(PATH).unwrap() {
         println!("[!] Database isn't created.\nTry 'rustsafe init' to create a database");
         return;
     }
     
+    logger::start_logger(LOGFILE);
+
     match argparse::parse_args(env::args()) {
         Some(cmd) => {
             match cmd {
@@ -38,6 +31,10 @@ fn main() {
                 Commands::Get(entry) => display_stored_credentials(Some(entry)),
                 Commands::List => display_stored_credentials(None),
                 Commands::Edit(entry) => update_existing_credential(entry),
+                Commands::Delete(entry) => remove_existing_credential(entry),
+                Commands::Passwd => update_master_password(),
+                Commands::Import(path) => import_credentials_from_json(path),
+                Commands::Export => export_credentials_to_json(),
                 _ => {},
             }
         },
@@ -187,8 +184,7 @@ fn update_existing_credential(search: String) {
     }
     
     let (idx, record) = req_record.unwrap();
-    // pretty print this 
-    println!("Record found\n{:?}", record);
+    record.pretty_print();
     
     print!("[+] Do you want to change this record ? (Y/n) : ");
     let choice = vault::fgets().to_lowercase();
@@ -200,16 +196,15 @@ fn update_existing_credential(search: String) {
 
     {
         let mut data: Vec<String> = Vec::new();
-        println!("[+] Edit the record. Leave the field empty to use current value");
-        print!("[+] Enter new username for '{}' : ", (*record).entry());
+        print!("[+] Enter new username for '{}' (optional): ", (*record).entry());
         let _u = vault::fgets();
         if _u.is_empty() { data.push((*record).username()) } else { data.push(_u) }
 
-        print!("[+] Enter new password for '{}' : ", (*record).entry());
+        print!("[+] Enter new password for '{}' (optional): ", (*record).entry());
         let _p = vault::fgets();
         if _p.is_empty() { data.push((*record).password()) } else { data.push(_p) }
 
-        print!("[+] Enter new email for '{}' : ", (*record).entry());
+        print!("[+] Enter new email for '{}' (optional): ", (*record).entry());
         let _e = vault::fgets();
         if _e.is_empty() { 
             if let Some(_email) = (*record).email() {
@@ -221,7 +216,7 @@ fn update_existing_credential(search: String) {
             data.push(_e);
         }
 
-        print!("[+] Enter new note for '{}' : ", (*record).entry());
+        print!("[+] Enter new note for '{}' (optional): ", (*record).entry());
         let _n = vault::fgets();
         if _n.is_empty() { 
             if let Some(_note) = (*record).note() {
@@ -256,11 +251,11 @@ fn update_master_password() {
     };
     
     print!("[+] Enter new master password: ");
-    let password: String = vault::fgets();
+    let passwd: String = vault::fgets();
     print!("[+] Enter new master password: ");
     let _password: String = vault::fgets();
     
-    if password != _password {
+    if passwd != _password {
         println!("[!] Passwords doesn't match!");
         return;
     }
@@ -288,7 +283,100 @@ fn update_master_password() {
     log!("Master password was changed");
 }
 
-fn import_credentials_from_json() {}
+fn remove_existing_credential(search: String) {
+    print!("[+] Enter master password: ");
+    let password: String = vault::fgets();
 
-fn export_credentials_to_json() {}
+    let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
+        Some(x) => x,
+        None => {
+            println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+            return;
+        }
+    };
+    
+    let mut req_record: Option<(usize, &vault::Record)> = None;
+
+    for (idx, record) in records.iter().enumerate() {
+        if record.username().contains(&search) || (*record).entry().contains(&search) {
+            req_record = Some((idx, record));
+            break;
+        }
+
+        if let Some(_email) = record.email() {
+            if _email == search {
+                req_record = Some((idx, record));
+                break;
+            }
+        }
+
+        if let Some(_note) = record.note() {
+            if _note.contains(&search) {
+                req_record = Some((idx, record));
+                break;
+            }
+        }
+    }
+
+    if let None = req_record {
+        println!("[!] No Records were found with that phrase '{}'", search);
+        log!("Password deletion no password's were found with the phrase '{}'", search);
+        return;
+    }
+    
+    let (idx, record) = req_record.unwrap();
+    record.pretty_print();
+    
+    print!("[+] Do you want to delete this record ? (Y/n) : ");
+    let choice = vault::fgets().to_lowercase();
+    
+    if !choice.is_empty() && choice.starts_with('n') {
+        println!("[#] Record Wasnt Deleted!");
+        return;
+    }
+    
+    records.remove(idx);
+    println!("[+] Record was Deleted!");
+
+    vault::dump(&records, PASSWORDFILE, &password);
+    
+    log!("Record was Deleted");
+}
+
+fn import_credentials_from_json(path: String) {
+    print!("[+] Enter master password: ");
+    let password: String = vault::fgets();
+
+    let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
+        Some(x) => x,
+        None => {
+            println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+            return;
+        }
+    };
+
+    print!("[+] Enter the password of the foreign json file: ");
+    let foreign_passwd = vault::fgets();
+
+    let foreign_records: Vec<vault::Record> = match vault::load(&path, &foreign_passwd) {
+        Some(x) => x,
+        None => {
+            println!("Error in Something");
+            return;
+        }
+    };
+
+    for record in foreign_records {
+        records.push(record);
+    }
+
+    vault::dump(&records, PASSWORDFILE, &password);
+    println!("[+] Passwords were imported successfully from {}", path);
+
+    log!("Passwords were imported successfully from {}", path);
+}
+
+fn export_credentials_to_json() {
+    // just copy the file to the EXPORTFILE
+}
 
