@@ -7,18 +7,11 @@ mod argparse;
 const PATH: &str = "/home/qwerty/.rustsafe";
 const PASSWORDFILE: &str = "/home/qwerty/.rustsafe/dump.json";
 const LOGFILE: &str = "/home/qwerty/.rustsafe/log";
-const EXPORT: &str = "/home/qwerty/desktop/main.json";
+const EXPORTFILE: &str = "/home/qwerty/desktop/export.json";
 
 type Commands = argparse::Commands;
 
 fn main() {
-    if !fs::exists(PATH).unwrap() {
-        println!("[!] Database isn't created.\nTry 'rustsafe init' to create a database");
-        return;
-    }
-    
-    logger::start_logger(LOGFILE);
-
     match argparse::parse_args(env::args()) {
         Some(cmd) => {
             match cmd {
@@ -26,16 +19,30 @@ fn main() {
                     Ok(()) => println!("[+] Database created successfully"),
                     Err(x) => println!("[!] Error: {x}")
                 },
-                Commands::Add(entry) => store_new_credential(entry),
+
                 Commands::Generate(size) => println!("Generated Password -> {}", vault::generate_rand_password(size)),  
-                Commands::Get(entry) => display_stored_credentials(Some(entry)),
-                Commands::List => display_stored_credentials(None),
-                Commands::Edit(entry) => update_existing_credential(entry),
-                Commands::Delete(entry) => remove_existing_credential(entry),
-                Commands::Passwd => update_master_password(),
-                Commands::Import(path) => import_credentials_from_json(path),
-                Commands::Export => export_credentials_to_json(),
-                _ => {},
+
+                _ => {
+
+                    if !fs::exists(PATH).unwrap() {
+                        println!("[!] Database isn't created.\nTry 'rustsafe init' to create a database");
+                        return;
+                    }
+                        
+                    logger::start_logger(LOGFILE);
+
+                    match cmd {
+                        Commands::Add(entry) => store_new_credential(entry),
+                        Commands::Get(entry) => display_stored_credentials(Some(entry)),
+                        Commands::List => display_stored_credentials(None),
+                        Commands::Edit(entry) => update_existing_credential(entry),
+                        Commands::Delete(entry) => remove_existing_credential(entry),
+                        Commands::Passwd => update_master_password(),
+                        Commands::Import(path) => import_credentials_from_json(path),
+                        Commands::Export => export_credentials_to_json(),
+                        _ => {},
+                    }
+                }
             }
         },
         None => {},
@@ -377,6 +384,20 @@ fn import_credentials_from_json(path: String) {
 }
 
 fn export_credentials_to_json() {
-    // just copy the file to the EXPORTFILE
+    print!("[+] Enter master password: ");
+    let password = vault::fgets();
+
+    let records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
+        Some(x) => x,
+        None => {
+            println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+            return;
+        }
+    };
+
+    vault::dump(&records, EXPORTFILE, &password);
+    println!("[+] Record was exported to '{}'", EXPORTFILE);
+
+    log!("Record was exported to '{}'", EXPORTFILE);
 }
 

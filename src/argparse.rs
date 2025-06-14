@@ -100,7 +100,7 @@ Commands:
   get <name>         Retrieve a password
   list               List all saved entries
   rm <name>          Remove an entry
-  generate           Generate a secure password
+  generate <size>    Generate a secure password
   import <path>      import passwords from a file
   export             export saved passwords to a file
 
