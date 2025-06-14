@@ -98,6 +98,7 @@ r#"Usage:
   rustsafe <command> [options]
 
 Commands:
+  init               Initiate's the database
   add <name>         Add a new password entry
   get <name>         Retrieve a password
   list               List all saved entries
@@ -105,10 +106,6 @@ Commands:
   generate <size>    Generate a secure password
   passwd             Change master password
   import <path>      import passwords from a file
-  export             export saved passwords to a file
-
-Options:
-  --copy             Copy password to clipboard (used with 'get')"#
-    );
+  export             export saved passwords to a file"#);
     }
 }
