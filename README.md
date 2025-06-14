@@ -22,6 +22,9 @@
 
 ## Security Design
 
+* **Secure Password Input**
+  Use of a crate preventing passwords from being visible on screen.
+
 * **Master Password Protection**
   Access to stored passwords requires a master password, which is never saved or stored directly.
 
@@ -47,9 +50,6 @@
 
 ## Planned Improvements
 
-* **Secure Password Input**
-  Use of a crate preventing passwords from being visible on screen.
-
 * **Enhanced Rate Limiting**
   Solidifying rate-limiting for master password attempts to reduce the risk of brute-force attacks. This will include time-based lockouts.
 
@@ -67,8 +67,7 @@
 ```bash
 git clone "https://github.com/TheBetterQwerty/RustSafe.git"
 cd RustSafe
-cargo build --release
-./target/release/rustsafe
+make
 ```
 
 ---
