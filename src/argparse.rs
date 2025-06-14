@@ -103,6 +103,7 @@ Commands:
   list               List all saved entries
   rm <name>          Remove an entry
   generate <size>    Generate a secure password
+  passwd             Change master password
   import <path>      import passwords from a file
   export             export saved passwords to a file
 

@@ -53,8 +53,9 @@ fn initialize_database() -> io::Result<()> {
     fs::create_dir(PATH)?;
     let _ = fs::File::create(PASSWORDFILE)?;
     let _ = fs::File::create(LOGFILE)?;
-    log!("Database created successfully");
+    println!("[+] Database created successfully!");
 
+    log!("Database created successfully");
     Ok(())
 }
 
@@ -70,20 +71,18 @@ fn display_stored_credentials(entry: Option<String>) {
         }
     };
     
-    let search: String;
     let mut found: bool = false;
 
-    if let Some(x) = entry {
-        search = x;
-    } else {
-        print!("[+] Enter username or email or entry name to search: ");
-        search = vault::fgets();
-        if search.is_empty() {
-            println!("[-] The search field was empty!");
-            return;
+    if let None = entry {        // if list is called
+        for record in records {
+            record.pretty_print();
+            println!();
         }
+        return;
     }
     
+    let search = entry.unwrap_or(String::from(""));
+
     for record in records {
         if record.entry() == search || record.username() == search {
             record.pretty_print();
@@ -130,12 +129,12 @@ fn store_new_credential(entry: String) {
     data.push(vault::fgets());
     
     print!("[+] Enter password for '{}' (on empty creates a safe password of length 30) : ", entry);
-    let pass: String = vault::fgets();
+    let mut pass: String = vault::fgets();
     if pass.is_empty() {
-        data.push(vault::generate_rand_password(30));
-    } else {
-        data.push(pass);
+        pass = vault::generate_rand_password(30);
+        println!("Generated password -> {}", pass);
     }
+    data.push(pass);
 
     print!("[+] Enter email for '{}' (optional): ", entry);
     data.push(vault::fgets());
@@ -146,7 +145,8 @@ fn store_new_credential(entry: String) {
     records.push(vault::Record::new(&data, &password));
     
     vault::dump(&records, PASSWORDFILE, &password);
-
+    
+    println!("[+] Credentials was stored into the database!");
     log!("New record was added to the database");
 }
 
@@ -288,6 +288,8 @@ fn update_master_password() {
     }
 
     vault::dump(&new_records, PASSWORDFILE, &_password);
+
+    println!("[+] Master password was changed successfully!");
     log!("Master password was changed");
 }
 
