@@ -1,4 +1,5 @@
 use std::{fs, io::{self, Write}, env};
+use rpassword;
 
 mod vault;
 mod logger;
@@ -60,8 +61,7 @@ fn initialize_database() -> io::Result<()> {
 }
 
 fn display_stored_credentials(entry: Option<String>) {
-    print!("[+] Enter master password: ");
-    let password: String = vault::fgets();
+    let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
     
     let records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
         Some(x) => x,
@@ -117,9 +117,8 @@ fn display_stored_credentials(entry: Option<String>) {
 fn store_new_credential(entry: String) {
     let mut data: Vec<String> = vec![entry.clone()];
 
-    print!("[+] Enter master password: ");
-    let password: String = vault::fgets();
-    
+    let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
+
     let mut records = match vault::load(PASSWORDFILE, &password) {
         Some(x) => x,
         None => Vec::new(),
@@ -151,8 +150,7 @@ fn store_new_credential(entry: String) {
 }
 
 fn update_existing_credential(search: String) {
-    print!("[+] Enter master password: ");
-    let password: String = vault::fgets();
+    let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
     let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
         Some(x) => x,
@@ -247,8 +245,7 @@ fn update_existing_credential(search: String) {
 }
 
 fn update_master_password() {
-    print!("[+] Enter master password: ");
-    let password: String = vault::fgets();
+    let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
     let records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
         Some(x) => x,
@@ -258,11 +255,9 @@ fn update_master_password() {
         }
     };
     
-    print!("[+] Enter new master password: ");
-    let passwd: String = vault::fgets();
-    print!("[+] Enter new master password: ");
-    let _password: String = vault::fgets();
-    
+    let passwd: String = rpassword::prompt_password("[+] Enter new master password: ").unwrap();
+    let _password: String = rpassword::prompt_password("[+] Enter new master password again: ").unwrap();
+ 
     if passwd != _password {
         println!("[!] Passwords doesn't match!");
         return;
@@ -294,8 +289,7 @@ fn update_master_password() {
 }
 
 fn remove_existing_credential(search: String) {
-    print!("[+] Enter master password: ");
-    let password: String = vault::fgets();
+    let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
     let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
         Some(x) => x,
@@ -354,8 +348,7 @@ fn remove_existing_credential(search: String) {
 }
 
 fn import_credentials_from_json(path: String) {
-    print!("[+] Enter master password: ");
-    let password: String = vault::fgets();
+    let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
     let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
         Some(x) => x,
@@ -387,8 +380,7 @@ fn import_credentials_from_json(path: String) {
 }
 
 fn export_credentials_to_json() {
-    print!("[+] Enter master password: ");
-    let password = vault::fgets();
+    let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
     let records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
         Some(x) => x,

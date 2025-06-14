@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use serde::{Serialize, Deserialize};
 use std::io::{self, Write};
 use std::fs;
