@@ -138,15 +138,8 @@ impl Record {
 
         calc_hash.push_str(key_plain);
         
-        /* 
-         * Condition will be true work if password is changed 
-         * That is when change_database_password() function in implemented 
-         * this will panic so in change_database_password() function change all 
-         * the hmac of each records
-         *
-         * */
         if encode(hash256(calc_hash)) == self.hmac {
-            panic!("[!] Hashes doesnt match!");
+            panic!("[!] Hashes doesnt match! Tamparing Detected");
         }
 
         Ok(Record {
@@ -161,14 +154,25 @@ impl Record {
     }
     
     pub fn pretty_print(&self) {
-        println!("|{:_^size$}|", self.entry, size = self.entry.len() + 10);
-        println!(" Entry: {}", self.username);
+        let mut lines: Vec<String> = vec![
+            format!("o Username: {}", self.username),
+            format!("o Password: {}", self.password)
+        ];
+            
         if let Some(email) = &self.email {
-            println!(" Email: {}", *email);
+            lines.insert(1, format!("o Email: {}", email));
         }
-        println!(" Password: {}", self.password);
+
         if let Some(note) = &self.note {
-            println!(" Note: {}", *note);
+            lines.push(format!("o Note: {}", note));
+        }
+
+        let width: usize = lines.iter().map(|x| (*x).len()).max().unwrap_or(0);
+        
+        println!("|{:_^width$}|", self.entry, width = width);
+
+        for line in lines {
+            println!("{line}");
         }
     }
 
@@ -221,10 +225,7 @@ pub fn load(path: &str, key: &str) -> Option<Vec<Record>> {
         let key_bytes = hash256(new_key);
         let decrypted_data = match record.decrypt_record(&key_bytes, &key) {
             Ok(x) => x,
-            Err(x) => {
-                println!("[!] Error: {x}");
-                continue;
-            },
+            Err(x) => panic!("{x}"),
         };
         decrypted_records.push(decrypted_data);
     }

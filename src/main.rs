@@ -78,18 +78,22 @@ fn display_stored_credentials(entry: Option<String>) {
     } else {
         print!("[+] Enter username or email or entry name to search: ");
         search = vault::fgets();
+        if search.is_empty() {
+            println!("[-] The search field was empty!");
+            return;
+        }
     }
     
     for record in records {
         if record.entry() == search || record.username() == search {
-            println!("Record Found: {:?}", record);
+            record.pretty_print();
             found = true;
             break;
         }
         
         if let Some(_email) = record.email() {
             if _email == search {
-                println!("Record Found {:?}", record);
+                record.pretty_print();
                 found = true;
                 break;
             }
@@ -97,7 +101,7 @@ fn display_stored_credentials(entry: Option<String>) {
 
         if let Some(note) = record.note() {
             if note == search {
-                println!("Record Found: {:?}", record);
+                record.pretty_print();
                 found = true;
                 break;
             }
@@ -119,10 +123,7 @@ fn store_new_credential(entry: String) {
     
     let mut records = match vault::load(PASSWORDFILE, &password) {
         Some(x) => x,
-        None => {
-            println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
-            return;
-        },
+        None => Vec::new(),
     };
 
     print!("[+] Enter username for '{}': ", entry);

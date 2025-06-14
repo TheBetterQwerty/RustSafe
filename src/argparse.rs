@@ -75,7 +75,9 @@ pub fn parse_args(args: Args) -> Option<Commands> {
         },
 
         Some("export") => return Some(Commands::Export),
-
+    
+        Some("help") => helper(Commands::Help),
+        
         Some(unknown) => helper(Commands::Invalid(unknown.to_string())),
 
         None => helper(Commands::Help),
