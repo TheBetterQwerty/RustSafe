@@ -15,10 +15,12 @@ pub enum Commands {
     Invalid(String),        // Invalid command
 }
 
-pub fn parse_args(args: Args) -> Option<Commands> {
-    let mut args = args.skip(1);
+pub fn parse_args(mut args: Args) -> Option<Commands> {
+    let prog_name = args.next().unwrap_or("rsafe".to_string());
     
     match args.next().as_deref() {
+        Some("version") => show_version(),
+
         Some("init") => return Some(Commands::Init),
 
         Some("add") => {
@@ -76,26 +78,26 @@ pub fn parse_args(args: Args) -> Option<Commands> {
 
         Some("export") => return Some(Commands::Export),
     
-        Some("help") => helper(Commands::Help),
+        Some("help") => helper(prog_name, Commands::Help),
         
-        Some(unknown) => helper(Commands::Invalid(unknown.to_string())),
+        Some(unknown) => helper(prog_name, Commands::Invalid(unknown.to_string())),
 
-        None => helper(Commands::Help),
+        None => helper(prog_name, Commands::Help),
     }
 
     None
 }
 
-fn helper(command: Commands) {
+fn helper(prog_name: String, command: Commands) {
     if let Commands::Invalid(cmd) = command {
-        println!("✘ Unknown command '{}'\nTry 'rustsafe help' for usage.", cmd);
+        println!("✘ Unknown command '{}'\nTry '{} help' for usage.", cmd, prog_name);
         return;
     }
     
     if let Commands::Help = command {
     println!(
 r#"Usage:
-  rustsafe <command> [options]
+  {} <command> [options]
 
 Commands:
   init               Initiate's the database
@@ -106,6 +108,10 @@ Commands:
   generate <size>    Generate a secure password
   passwd             Change master password
   import <path>      import passwords from a file
-  export             export saved passwords to a file"#);
+  export             export saved passwords to a file"#, prog_name);
     }
+}
+
+fn show_version() {
+    println!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 }
