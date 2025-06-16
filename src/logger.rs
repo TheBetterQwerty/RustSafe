@@ -11,13 +11,15 @@ const BAN: &str = "You are banned for 5 minutes";
 const BAN_TIME: u128 = 3_00_000; // 5 minutes
 
 pub fn start_logger(path: &str) -> Option<u128> {
-    let file = match OpenOptions::new().read(true).write(true).create(true).open(path) {
-        Ok(x) => x,
-        Err(x) => panic!("[!] Error: {x}"),
-    };
-    
-    let mut logger = LOGGER.lock().unwrap();
-    *logger = Some(file);
+    {
+        let file = match OpenOptions::new().read(true).write(true).create(true).open(path) {
+            Ok(x) => x,
+            Err(x) => panic!("[!] Error: {x}"),
+        };
+
+        let mut logger = LOGGER.lock().unwrap();
+        *logger = Some(file);
+    }
 
     check_if_banned()
 }

@@ -36,7 +36,7 @@ fn main() {
                         );
                         return;
                     }
-                        
+                    
                     match logger::start_logger(LOGFILE) {
                         Some(milli) => {
                             let time: f64 = ((milli as f64) / 1000.0) / 60.0 ;
