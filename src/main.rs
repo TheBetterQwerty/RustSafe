@@ -1,10 +1,13 @@
+/* Imports */
 use std::{fs, io::{self, Write}, env};
 use rpassword;
 
+/* Modules */
 mod vault;
 mod logger;
 mod argparse;
 
+/* Constants */
 const PATH: &str = "/home/qwerty/.rustsafe";
 const PASSWORDFILE: &str = "/home/qwerty/.rustsafe/dump.json";
 const LOGFILE: &str = "/home/qwerty/.rustsafe/log";
@@ -26,11 +29,22 @@ fn main() {
                 _ => {
 
                     if !fs::exists(PATH).unwrap() {
-                        println!("[!] Database isn't created.\nTry 'rustsafe init' to create a database");
+                        println!("[!] Database isn't created.\nTry '{} init' to create a database", 
+                            env::args()
+                                .nth(0)
+                                .unwrap_or("".to_string())
+                        );
                         return;
                     }
                         
-                    logger::start_logger(LOGFILE);
+                    match logger::start_logger(LOGFILE) {
+                        Some(milli) => {
+                            let time: f64 = ((milli as f64) / 1000.0) / 60.0 ;
+                            println!("[+] You are banned for {} minutes", time);
+                            return;
+                        },
+                        None => {}
+                    }
 
                     match cmd {
                         Commands::Add(entry) => store_new_credential(entry),
@@ -64,9 +78,18 @@ fn display_stored_credentials(entry: Option<String>) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
     
     let records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
-        Some(x) => x,
-        None => {
-            println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+        Ok(y) => match y {
+            Some(x) => x,
+            None => {
+                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+                return;
+            }
+        },
+        Err(err) => {
+            if err.contains("[!] Error decrypting message") {
+                println!("[!] Incorrect Password");
+                logger::give_ban();
+            }
             return;
         }
     };
@@ -119,9 +142,21 @@ fn store_new_credential(entry: String) {
 
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
-    let mut records = match vault::load(PASSWORDFILE, &password) {
-        Some(x) => x,
-        None => Vec::new(),
+    let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
+        Ok(y) => match y {
+            Some(x) => x,
+            None => {
+                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+                return;
+            }
+        },
+        Err(err) => {
+            if err.contains("[!] Error decrypting message") {
+                println!("[!] Incorrect Password");
+                logger::give_ban();
+            }
+            return;
+        }
     };
 
     print!("[+] Enter username for '{}': ", entry);
@@ -151,11 +186,20 @@ fn store_new_credential(entry: String) {
 
 fn update_existing_credential(search: String) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
-
+    
     let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
-        Some(x) => x,
-        None => {
-            println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+        Ok(y) => match y {
+            Some(x) => x,
+            None => {
+                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+                return;
+            }
+        },
+        Err(err) => {
+            if err.contains("[!] Error decrypting message") {
+                println!("[!] Incorrect Password");
+                logger::give_ban();
+            }
             return;
         }
     };
@@ -248,9 +292,18 @@ fn update_master_password() {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
     let records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
-        Some(x) => x,
-        None => {
-            println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+        Ok(y) => match y {
+            Some(x) => x,
+            None => {
+                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+                return;
+            }
+        },
+        Err(err) => {
+            if err.contains("[!] Error decrypting message") {
+                println!("[!] Incorrect Password");
+                logger::give_ban();
+            }
             return;
         }
     };
@@ -290,11 +343,20 @@ fn update_master_password() {
 
 fn remove_existing_credential(search: String) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
-
+    
     let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
-        Some(x) => x,
-        None => {
-            println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+        Ok(y) => match y {
+            Some(x) => x,
+            None => {
+                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+                return;
+            }
+        },
+        Err(err) => {
+            if err.contains("[!] Error decrypting message") {
+                println!("[!] Incorrect Password");
+                logger::give_ban();
+            }
             return;
         }
     };
@@ -349,22 +411,38 @@ fn remove_existing_credential(search: String) {
 
 fn import_credentials_from_json(path: String) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
-
+    
     let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
-        Some(x) => x,
-        None => {
-            println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+        Ok(y) => match y {
+            Some(x) => x,
+            None => {
+                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+                return;
+            }
+        },
+        Err(err) => {
+            if err.contains("[!] Error decrypting message") {
+                println!("[!] Incorrect Password");
+                logger::give_ban();
+            }
             return;
         }
     };
 
-    print!("[+] Enter the password of the foreign json file: ");
-    let foreign_passwd = vault::fgets();
+    let foreign_passwd = rpassword::prompt_password("[+] Enter the password of the foreign json file: ").unwrap();
 
-    let foreign_records: Vec<vault::Record> = match vault::load(&path, &foreign_passwd) {
-        Some(x) => x,
-        None => {
-            println!("Error in Something");
+    let foreign_records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &foreign_passwd) {
+        Ok(y) => match y {
+            Some(x) => x,
+            None => {
+                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+                return;
+            }
+        },
+        Err(err) => {
+            if err.contains("[!] Error decrypting message") {
+                println!("[!] Incorrect Password"); // no need to ban for foreign records
+            }
             return;
         }
     };
@@ -381,11 +459,20 @@ fn import_credentials_from_json(path: String) {
 
 fn export_credentials_to_json() {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
-
+    
     let records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
-        Some(x) => x,
-        None => {
-            println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+        Ok(y) => match y {
+            Some(x) => x,
+            None => {
+                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+                return;
+            }
+        },
+        Err(err) => {
+            if err.contains("[!] Error decrypting message") {
+                println!("[!] Incorrect Password");
+                logger::give_ban();
+            }
             return;
         }
     };

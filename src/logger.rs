@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 /* IMPORTS */
 use std::fs::{File, OpenOptions};
 use std::sync::Mutex;
@@ -12,7 +10,7 @@ const SIZE: usize = 300;
 const BAN: &str = "You are banned for 5 minutes";
 const BAN_TIME: u128 = 3_00_000; // 5 minutes
 
-pub fn start_logger(path: &str) {
+pub fn start_logger(path: &str) -> Option<u128> {
     let file = match OpenOptions::new().read(true).write(true).create(true).open(path) {
         Ok(x) => x,
         Err(x) => panic!("[!] Error: {x}"),
@@ -20,24 +18,27 @@ pub fn start_logger(path: &str) {
     
     let mut logger = LOGGER.lock().unwrap();
     *logger = Some(file);
+
+    check_if_banned()
 }
 
-pub fn check_file_length() {
+pub fn check_file() {
     let mut logger = LOGGER.lock().unwrap();
     if let Some(ref mut file) = *logger {
         let mut data: String = String::new();
-        file.seek(SeekFrom::Start(0)).unwrap();
+        let _ = file.read_to_string(&mut data).unwrap();
 
-        let _ = file.read_to_string(&mut data);
-        let n = data.chars().filter(|c| *c == '\n').count();
+        let mut lines: Vec<_> = data
+            .split('\n')
+            .filter(|x| !x.is_empty())
+            .collect();
 
-        if n >= SIZE {
-            let mut x: Vec<_> = data.split('\n').collect();
-            let _ = x.remove(0);
-            
+        if lines.len() >= SIZE {
+            lines.drain(0..(lines.len() - SIZE + 1));
+
             file.set_len(0).unwrap();
             file.seek(SeekFrom::Start(0)).unwrap();
-            write!(file, "{}", x.join("\n")).unwrap();
+            write!(file, "{}", lines.join("\n")).unwrap();
         }
     }
 }
@@ -49,41 +50,67 @@ pub fn get_current_time() -> u128 {
         .as_millis()
 }
 
-/* This function will return the time left until unban 
- * if it return None that means that last log isnt a BAN log 
- * OR user's ban time is up
- * */
-pub fn get_elapsed_time() -> bool {
-    let mut time_left: u128 = 0;
+pub fn give_ban() {
     let mut logger = LOGGER.lock().unwrap();
     if let Some(ref mut file) = *logger {
         let mut data = String::new();
         file.seek(SeekFrom::Start(0)).unwrap();
-        let _ = file.read_to_string(&mut data);
-        let logs: Vec<_> = data.split('\n').collect();
-        if let Some(last_log) = logs.last() {
-            if !last_log.contains(BAN) {
-                return false;
-            }
-            /* 12345667 HELLO WORLD */
-            let arg = last_log.split(' ').nth(0).unwrap(); // [ 12345667 , HELLO , WORLD ]
-            let arg: u128 = arg.parse().expect("[!] Error parsing data!"); // 12345667 -> u128
+        file.read_to_string(&mut data).unwrap();
+        
+        let fails = data
+            .split('\n')
+            .rev()
+            .take(5)
+            .filter(|x| x.contains("Login Failed"))
+            .count();
 
-            time_left = get_current_time() - arg;
+        if fails == 5 {
+            writeln!(file, "{} {}", get_current_time(), BAN).expect("[!] Error writting to logfile");
+            return;
+        }
+
+        writeln!(file, "{} Login Failed", get_current_time()).expect("[!] Error writting to logfile");
+    }
+}
+
+fn check_if_banned() -> Option<u128> {
+    let mut logger = LOGGER.lock().unwrap();
+    if let Some(ref mut file) = *logger {
+        let mut data = String::new();
+        file.seek(SeekFrom::Start(0)).unwrap();
+        file.read_to_string(&mut data).unwrap();
+        
+        let last_log = data
+                .split('\n')
+                .rev()
+                .nth(0)
+                .unwrap();
+        
+        if last_log.contains(BAN) {
+            let lock_time: u128 = last_log
+                .split(' ')
+                .nth(0)
+                .unwrap()
+                .parse()
+                .unwrap_or(0);
+
+            let time_left = get_current_time() - lock_time;
+
+            if time_left > BAN_TIME {
+                return None;
+            }
+            
+            return Some(time_left);
         }
     }
-    
-    if time_left < BAN_TIME {
-        return true;
-    }
 
-    return false;
+    None
 }
 
 #[macro_export]
 macro_rules! log {
     ($($arg:tt)*) => {
-        logger::check_file_length(); // checks for length
+        logger::check_file();
         let mut logger = logger::LOGGER.lock().unwrap();
         if let Some(ref mut file) = *logger {
             let time = logger::get_current_time();

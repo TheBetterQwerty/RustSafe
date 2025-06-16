@@ -100,6 +100,7 @@ r#"Usage:
   {} <command> [options]
 
 Commands:
+  version            Displays current version
   init               Initiate's the database
   add <name>         Add a new password entry
   get <name>         Retrieve a password

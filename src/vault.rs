@@ -196,7 +196,7 @@ impl Record {
     }
 }
 
-pub fn load(path: &str, key: &str) -> Option<Vec<Record>> {
+pub fn load(path: &str, key: &str) -> Result<Option<Vec<Record>>, String> {
     // TODO: send the result too to log and give ban
     let data: String = match fs::read_to_string(path) {
         Ok(x) => x,
@@ -204,7 +204,7 @@ pub fn load(path: &str, key: &str) -> Option<Vec<Record>> {
     };
 
     if data.len() == 0 {
-        return None;
+        return Ok(None);
     }
 
     let records: Vec<Record> = match serde_json::from_str(&data) {
@@ -223,12 +223,12 @@ pub fn load(path: &str, key: &str) -> Option<Vec<Record>> {
         let key_bytes = hash256(new_key);
         let decrypted_data = match record.decrypt_record(&key_bytes, &key) {
             Ok(x) => x,
-            Err(x) => panic!("{x}"),
+            Err(x) => return Err(x),
         };
         decrypted_records.push(decrypted_data);
     }
 
-    Some(decrypted_records)
+    Ok(Some(decrypted_records))
 }
 
 pub fn dump(records: &[Record], path: &str, key: &str) {
@@ -303,7 +303,7 @@ fn decrypt(key: &[u8], ciphertext: &String, nonce: &[u8]) -> Result<String, Stri
     let plaintext = match cipher.decrypt(nonce, ciphertext.as_ref()) {
         Ok(x) => x,
         Err(x) => {
-            return Err(format!("[!] Error decrypting message: {}", x).to_owned());
+            return Err(format!("[!] Error decrypting message: {}", x));
         },
     };
  
