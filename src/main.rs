@@ -145,10 +145,7 @@ fn store_new_credential(entry: String) {
     let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
         Ok(y) => match y {
             Some(x) => x,
-            None => {
-                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
-                return;
-            }
+            None => Vec::new(),
         },
         Err(err) => {
             if err.contains("[!] Error decrypting message") {
