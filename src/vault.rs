@@ -2,11 +2,12 @@ use serde::{Serialize, Deserialize};
 use std::io::{self, Write};
 use std::fs;
 use hex::{encode, decode};
+use hmac::{Mac, Hmac};
+use hmac::digest::KeyInit as HmacKeyInit;
 use sha2::{Sha256, Digest};
 use rand::{rng, random, distr::{Alphanumeric, SampleString}};
 use aes_gcm::{
-    aead::{Aead, KeyInit},
-    Aes256Gcm, Key, Nonce,
+    aead::Aead, Aes256Gcm, Key, Nonce,
 };
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -20,29 +21,25 @@ pub struct Record {
     hmac: String,
 }
 
+type HmacSha256 = Hmac<Sha256>;
 
 impl Record {
     pub fn new(data: &[String], key: &str) -> Self {
-        /* 
-         * HMAC calculation:
-         *  o salt + (fields that are not empty) + key
-         *  o sha256 hash 
-         *
-         * */
         let bytes: Vec<u8> = (0..12).map(|_| { random::<u8>() }).collect();
-        let salt = encode(bytes);
-
-        let mut vec = data
-            .iter()
-            .filter(|field| !field.is_empty())
-            .cloned()                                    // &Vec<String> -> Vec<String>
-            .collect::<Vec<String>>();
+        let salt = encode(&bytes);
         
-        vec.insert(0, salt.clone());
-        vec.push(key.to_string());
-        
-        let calc_hash = vec.join("\n");
+        /* key = hash(salt[..12] + key + salt[12..]) */
+        let mut key_byte = String::new();
+        key_byte.push_str(&salt[..12]);
+        key_byte.push_str(key);
+        key_byte.push_str(&salt[12..]);
 
+        let mut mac = <HmacSha256 as HmacKeyInit>::new_from_slice(key_byte.as_bytes()).expect("[!] Error: Creating hmac");
+        mac.update(&bytes);
+        for x in data {
+            mac.update(x.as_bytes());
+        }
+        
         Record {
             salt,
             entry: data[0].clone(),
@@ -50,7 +47,7 @@ impl Record {
             password: data[2].clone(),
             email: if data[3].is_empty() { None } else { Some(data[3].clone()) },
             note: if data[4].is_empty() { None } else { Some(data[4].clone()) },
-            hmac: encode(hash256(calc_hash)),
+            hmac: encode(mac.finalize().into_bytes()),
         }
     }
 
@@ -93,14 +90,14 @@ impl Record {
         }
     }
 
-    fn decrypt_record(&self, key: &[u8], key_plain: &str) -> Result<Self,String> {
+    fn decrypt_record(&self, key: &[u8]) -> Result<Self,String> {
+        let mut mac = <HmacSha256 as HmacKeyInit>::new_from_slice(key).expect("[!] Error: Creating hmac");
         let nonce = decode(&self.salt).unwrap();
-        let mut calc_hash = String::from(self.entry.clone());
         let (mut email, mut note) = (None, None);
 
         let username = match decrypt(key, &self.username, &nonce) {
             Ok(x) => { 
-                calc_hash.push_str(&x);
+                mac.update(x.as_bytes());
                 x
             },
             Err(x) => return Err(x),
@@ -108,7 +105,7 @@ impl Record {
        
         let password = match decrypt(key, &self.password, &nonce) {
             Ok(x) => { 
-                calc_hash.push_str(&x);
+                mac.update(x.as_bytes());
                 x
             },
             Err(x) => return Err(x),
@@ -117,7 +114,7 @@ impl Record {
         if let Some(_email) = &self.email {
             email = match decrypt(key, &_email, &nonce) {
                 Ok(x) => { 
-                    calc_hash.push_str(&x);
+                    mac.update(x.as_bytes());
                     Some(x)
                 },
                 Err(x) => return Err(x),
@@ -127,16 +124,14 @@ impl Record {
         if let Some(_note) = &self.note {
             note = match decrypt(key, &_note, &nonce) {
                 Ok(x) => { 
-                    calc_hash.push_str(&x);
+                    mac.update(x.as_bytes());
                     Some(x)
                 },           
                 Err(x) => return Err(x),
             };
         }
 
-        calc_hash.push_str(key_plain);
-        
-        if encode(hash256(calc_hash)) == self.hmac {
+        if encode(mac.finalize().into_bytes()) == self.hmac {
             panic!("[!] Hashes doesnt match! Tamparing Detected");
         }
 
@@ -214,18 +209,19 @@ pub fn load(path: &str, key: &str) -> Result<Option<Vec<Record>>, String> {
 
     /* Decrypt the records */
     let mut decrypted_records: Vec<Record> = Vec::new();
+    let mut new_key: String = String::new();
+
     for record in records {
         // key = hash(nonce[..12] + key + nonce[12..])
-        let mut new_key: String = String::new();
         new_key.push_str(&record.salt[..12]);
         new_key.push_str(key);
         new_key.push_str(&record.salt[12..]);
-        let key_bytes = hash256(new_key);
-        let decrypted_data = match record.decrypt_record(&key_bytes, &key) {
+        let decrypted_data = match record.decrypt_record(&hash256(&new_key)) {
             Ok(x) => x,
             Err(x) => return Err(x),
         };
         decrypted_records.push(decrypted_data);
+        new_key.clear();
     }
 
     Ok(Some(decrypted_records))
@@ -233,15 +229,15 @@ pub fn load(path: &str, key: &str) -> Result<Option<Vec<Record>>, String> {
 
 pub fn dump(records: &[Record], path: &str, key: &str) {
     let mut encrypted_records: Vec<Record> = Vec::new();
+    let mut new_key: String = String::new();
 
     for record in records {
         // key = hash(nonce[..12] + key + nonce[12..])
-        let mut new_key: String = String::new();
         new_key.push_str(&record.salt[..12]);
         new_key.push_str(key);
         new_key.push_str(&record.salt[12..]);
-        let key_bytes = hash256(new_key);
-        encrypted_records.push((*record).encrypt_record(&key_bytes));
+        encrypted_records.push((*record).encrypt_record(&hash256(&new_key)));
+        new_key.clear();
     }
 
     let encoded = match serde_json::to_string_pretty(&encrypted_records) {
@@ -267,7 +263,7 @@ pub fn fgets() -> String {
     return input.trim().to_owned();
 }
 
-fn hash256(text: String) -> [u8; 32] { 
+fn hash256(text: &String) -> [u8; 32] { 
     let res = Sha256::digest(text.as_bytes());
     let mut bytes = [0u8; 32];
     bytes.copy_from_slice(&res);
