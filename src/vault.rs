@@ -162,7 +162,7 @@ impl Record {
 
         let width: usize = lines.iter().map(|x| (*x).len()).max().unwrap_or(0);
         
-        println!("|{:_^width$}|", self.entry, width = width);
+        println!("\n|{:-^width$}|", self.entry, width = width);
 
         for line in lines {
             println!("{line}");
