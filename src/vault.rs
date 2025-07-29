@@ -39,6 +39,7 @@ impl Record {
         for x in data {
             mac.update(x.as_bytes());
         }
+    
         
         Record {
             salt,
