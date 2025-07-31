@@ -19,41 +19,41 @@ pub fn parse_args(mut args: Args) -> Option<Commands> {
     let prog_name = args.next().unwrap_or("rsafe".to_string());
     
     match args.next().as_deref() {
-        Some("version") => show_version(),
+        Some("--version") | Some("-v") => show_version(),
 
-        Some("init") => return Some(Commands::Init),
+        Some("--init") => return Some(Commands::Init),
 
-        Some("add") => {
+        Some("--add") => {
             if let Some(entry) = args.next() {
                 return Some(Commands::Add(entry)); 
             }
-            println!("[?] Missing argument for 'add'");
+            println!("[?] Missing argument for '--add'");
         },
         
-        Some("edit") => {
+        Some("--edit") => {
             if let Some(entry) = args.next() {
                 return Some(Commands::Edit(entry));
             }
-            println!("[?] Missing arguments for 'edit'");
+            println!("[?] Missing arguments for '--edit'");
         },
         
-        Some("get") => {
+        Some("--get") => {
             if let Some(entry) = args.next() {
                 return Some(Commands::Get(entry));
             }
-            println!("[?] Missing argument for 'get'");
+            println!("[?] Missing argument for '--get'");
         },
 
-        Some("list") => return Some(Commands::List),
+        Some("--list") => return Some(Commands::List),
 
-        Some("rm") => {
+        Some("--rm") => {
             if let Some(entry) = args.next() {
                 return Some(Commands::Delete(entry));
             }
-            println!("[?] Missing argument for 'rm'");
+            println!("[?] Missing argument for '--rm'");
         },
 
-        Some("generate") => {
+        Some("--generate") => {
             if let Some(size) = args.next() {
                 let size: usize = match size.parse() {
                     Ok(x) => x,
@@ -64,21 +64,21 @@ pub fn parse_args(mut args: Args) -> Option<Commands> {
                 };
                 return Some(Commands::Generate(size));
             }
-            println!("[?] Missing argument for 'generate'");
+            println!("[?] Missing argument for '--generate'");
         },
 
-        Some("passwd") => return Some(Commands::Passwd),
+        Some("--passwd") => return Some(Commands::Passwd),
 
-        Some("import") => {
+        Some("--import") => {
             if let Some(path) = args.next() {
                 return Some(Commands::Import(path));
             }
-            println!("[?] Missing argument for 'import'");
+            println!("[?] Missing argument for '--import'");
         },
 
-        Some("export") => return Some(Commands::Export),
+        Some("--export") => return Some(Commands::Export),
     
-        Some("help") => helper(prog_name, Commands::Help),
+        Some("--help") | Some("-h") => helper(prog_name, Commands::Help),
         
         Some(unknown) => helper(prog_name, Commands::Invalid(unknown.to_string())),
 
@@ -90,7 +90,7 @@ pub fn parse_args(mut args: Args) -> Option<Commands> {
 
 fn helper(prog_name: String, command: Commands) {
     if let Commands::Invalid(cmd) = command {
-        println!("✘ Unknown command '{}'\nTry '{} help' for usage.", cmd, prog_name);
+        println!("✘ Unknown command '{}'\nTry '{} --help' for usage.", cmd, prog_name);
         return;
     }
     
@@ -100,16 +100,16 @@ r#"Usage:
   {} <command> [options]
 
 Commands:
-  version            Displays current version
-  init               Initiate's the database
-  add <name>         Add a new password entry
-  get <name>         Retrieve a password
-  list               List all saved entries
-  rm <name>          Remove an entry
-  generate <size>    Generate a secure password
-  passwd             Change master password
-  import <path>      import passwords from a file
-  export             export saved passwords to a file"#, prog_name);
+  --version            Displays current version
+  --init               Initiate's the database
+  --add <name>         Add a new password entry
+  --get <name>         Retrieve a password
+  --list               List all saved entries
+  --rm <name>          Remove an entry
+  --generate <size>    Generate a secure password
+  --passwd             Change master password
+  --import <path>      import passwords from a file
+  --export             export saved passwords to a file"#, prog_name);
     }
 }
 
