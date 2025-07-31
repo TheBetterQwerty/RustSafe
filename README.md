@@ -6,17 +6,18 @@
 
 ## Features
 
-| Command           | Description                                |
-| ----------------- | ------------------------------------------ |
-| `init`            | Initiate's the database
-| `add <name>`      | Add a new password entry                   |
-| `get <name>`      | Retrieve a stored password                 |
-| `list`            | List all saved entries                     |
-| `rm <name>`       | Remove an entry                            |
-| `generate <size>` | Generate a secure, random password         |
-| `passwd`          | Change the master password                 |
-| `import <path>`   | Import passwords from a JSON file          |
-| `export`          | Export all passwords to a secure JSON file |
+| Command             | Description                                |
+| ------------------- | ------------------------------------------ |
+| `--version`         | Current Version of RustSafe                |
+| `--init`            | Initiate's the database                    |
+| `--add <name>`      | Add a new password entry                   |
+| `--get <name>`      | Retrieve a stored password                 |
+| `--list`            | List all saved entries                     |
+| `--rm <name>`       | Remove an entry                            |
+| `--generate <size>` | Generate a secure, random password         |
+| `--passwd`          | Change the master password                 |
+| `--import <path>`   | Import passwords from a JSON file          |
+| `--export`          | Export all passwords to a secure JSON file |
 
 ---
 
@@ -36,6 +37,12 @@
 
 * **Local-Only Storage**
   Passwords are stored only on the local file system in encrypted form. No network access is required or used.
+
+---
+
+## Issues
+
+* Rate Limiting Not Working 
 
 ---
 
