@@ -83,8 +83,7 @@ fn display_stored_credentials(entry: Option<String>) {
             None => {
                 println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
                 return;
-            }
-        },
+            } },
         Err(err) => {
             if err.contains("[!] Error decrypting message") {
                 println!("[!] Incorrect Password");
@@ -94,36 +93,32 @@ fn display_stored_credentials(entry: Option<String>) {
         }
     };
     
-    let mut found: bool = false;
-
     if let None = entry {        // if list is called
-        for record in records {
-            record.pretty_print();
-            println!();
-        }
+        vault::record_fmt(vault::RecordPrint::VECTOR(records));
         return;
     }
     
     let search = entry.unwrap_or(String::from(""));
-
+    let mut found = false;
+    
     for record in records {
-        if record.entry() == search || record.username() == search {
-            record.pretty_print();
+        if record.entry().contains(&search) || record.username().contains(&search) {
+            vault::record_fmt(vault::RecordPrint::RECORD(record));
             found = true;
             break;
         }
         
         if let Some(_email) = record.email() {
-            if _email == search {
-                record.pretty_print();
+            if _email.contains(&search) {
+                vault::record_fmt(vault::RecordPrint::RECORD(record));
                 found = true;
                 break;
             }
         }
 
         if let Some(note) = record.note() {
-            if note == search {
-                record.pretty_print();
+            if note.contains(&search) {
+                vault::record_fmt(vault::RecordPrint::RECORD(record));
                 found = true;
                 break;
             }
@@ -132,8 +127,9 @@ fn display_stored_credentials(entry: Option<String>) {
 
     if !found {
         println!("[!] Record with '{}' doesn't exists", search);
+        return;
     }
-
+    
     log!("Records were viewed");
 }
 
@@ -210,7 +206,7 @@ fn update_existing_credential(search: String) {
         }
 
         if let Some(_email) = record.email() {
-            if _email == search {
+            if _email.contains(&search) {
                 req_record = Some((idx, record));
                 break;
             }
@@ -231,7 +227,7 @@ fn update_existing_credential(search: String) {
     }
     
     let (idx, record) = req_record.unwrap();
-    record.pretty_print();
+    vault::record_fmt(vault::RecordPrint::RECORD(record.clone()));
     
     print!("[+] Do you want to change this record ? (Y/n) : ");
     let choice = vault::fgets().to_lowercase();
@@ -367,7 +363,7 @@ fn remove_existing_credential(search: String) {
         }
 
         if let Some(_email) = record.email() {
-            if _email == search {
+            if _email.contains(&search) {
                 req_record = Some((idx, record));
                 break;
             }
@@ -388,7 +384,7 @@ fn remove_existing_credential(search: String) {
     }
     
     let (idx, record) = req_record.unwrap();
-    record.pretty_print();
+    vault::record_fmt(vault::RecordPrint::RECORD(record.clone()));
     
     print!("[+] Do you want to delete this record ? (Y/n) : ");
     let choice = vault::fgets().to_lowercase();

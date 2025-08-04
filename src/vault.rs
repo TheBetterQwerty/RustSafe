@@ -5,12 +5,19 @@ use hex::{encode, decode};
 use hmac::{Mac, Hmac};
 use hmac::digest::KeyInit as HmacKeyInit;
 use sha2::{Sha256, Digest};
-use rand::{rng, random, distr::{Alphanumeric, SampleString}};
+use rand::{
+    rng, random, 
+    distr::{Alphanumeric, SampleString}
+};
 use aes_gcm::{
     aead::Aead, Aes256Gcm, Key, Nonce,
 };
+use tabled::{
+    Tabled, Table,
+    settings::{Style, Alignment, object::Columns}
+};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Record {
     salt: String,
     entry: String,
@@ -19,6 +26,20 @@ pub struct Record {
     email: Option<String>,
     note: Option<String>,
     hmac: String,
+}
+
+#[derive(Tabled)]
+struct TabledData {
+    entry: String,
+    username: String,
+    password: String,
+    email: String,
+    note: String,
+}
+
+pub enum RecordPrint {
+    VECTOR(Vec<Record>),
+    RECORD(Record),
 }
 
 type HmacSha256 = Hmac<Sha256>;
@@ -146,29 +167,6 @@ impl Record {
         })
     }
     
-    pub fn pretty_print(&self) {
-        let mut lines: Vec<String> = vec![
-            format!("o Username: {}", self.username),
-            format!("o Password: {}", self.password)
-        ];
-            
-        if let Some(email) = &self.email {
-            lines.insert(1, format!("o Email: {}", email));
-        }
-
-        if let Some(note) = &self.note {
-            lines.push(format!("o Note: {}", note));
-        }
-
-        let width: usize = lines.iter().map(|x| (*x).len()).max().unwrap_or(0);
-        
-        println!("\n|{:-^width$}|", self.entry, width = width);
-
-        for line in lines {
-            println!("{line}");
-        }
-    }
-
     // entry username email note
     pub fn entry(&self) -> String {
         self.entry.clone()
@@ -189,6 +187,34 @@ impl Record {
     pub fn note(&self) -> Option<String> {
         self.note.clone()
     }
+}
+
+impl TabledData {
+    fn new(data: Record) -> Self {
+        let null = String::from("Null");
+        TabledData { 
+            entry: data.entry(), username: data.username(), password: data.password(), 
+            email: data.email().unwrap_or(null.clone()), note: data.note().unwrap_or(null.clone())
+        }
+    }
+}
+
+pub fn record_fmt(data: RecordPrint) {
+    let mut tabled_data: Vec<TabledData> = Vec::new();
+    
+    match data {
+        RecordPrint::VECTOR(records) => {
+            for record in records {
+                tabled_data.push(TabledData::new(record));
+            }
+        },
+        RecordPrint::RECORD(record) => tabled_data.push(TabledData::new(record)),
+    }
+
+    let mut tabled_data = Table::new(tabled_data);
+    tabled_data.with(Style::rounded());
+    tabled_data.modify(Columns::first(), Alignment::right());
+    println!("{}", tabled_data);
 }
 
 pub fn load(path: &str, key: &str) -> Result<Option<Vec<Record>>, String> {
