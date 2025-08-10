@@ -240,6 +240,8 @@ fn update_existing_credential(search: String) {
     {
         let mut data: Vec<String> = Vec::new();
         print!("[+] Enter new username for '{}' (optional): ", (*record).entry());
+        data.push((*record).entry());
+
         let _u = vault::fgets();
         if _u.is_empty() { data.push((*record).username()) } else { data.push(_u) }
 
@@ -270,7 +272,8 @@ fn update_existing_credential(search: String) {
         } else {
             data.push(_n);
         }
-
+        
+        println!("{:?}", data);
         records[idx] = vault::Record::new(&data, &password);
 
         println!("[+] Credentials was updated sucessfully");

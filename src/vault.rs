@@ -46,6 +46,10 @@ type HmacSha256 = Hmac<Sha256>;
 
 impl Record {
     pub fn new(data: &[String], key: &str) -> Self {
+        if data.len() != 5 {
+            panic!("[!] Error: new function call requires 5");
+        }
+
         let bytes: Vec<u8> = (0..12).map(|_| { random::<u8>() }).collect();
         let salt = encode(&bytes);
         

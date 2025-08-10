@@ -105,11 +105,12 @@ Commands:
   --add <name>         Add a new password entry
   --get <name>         Retrieve a password
   --list               List all saved entries
+  --edit <name>        Edit an entry
   --rm <name>          Remove an entry
   --generate <size>    Generate a secure password
   --passwd             Change master password
-  --import <path>      import passwords from a file
-  --export             export saved passwords to a file"#, prog_name);
+  --import <path>      Import passwords from a file
+  --export             Export saved passwords to a file"#, prog_name);
     }
 }
 
