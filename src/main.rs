@@ -19,9 +19,16 @@ fn main() {
     match argparse::parse_args(env::args()) {
         Some(cmd) => {
             match cmd {
-                Commands::Init => match initialize_database() {
-                    Ok(()) => println!("[+] Database created successfully"),
-                    Err(x) => println!("[!] Error: {x}")
+                Commands::Init => {
+                    if fs::exists(PATH).unwrap() {
+                        println!("[+] DataBase Already Exists!");
+                        return;
+                    }
+
+                    match initialize_database() {
+                        Ok(()) => println!("[+] Database created successfully"),
+                        Err(x) => println!("[!] Error: {x}")
+                    }
                 },
 
                 Commands::Generate(size) => println!("Generated Password -> {}", vault::generate_rand_password(size)),  
@@ -68,7 +75,6 @@ fn initialize_database() -> io::Result<()> {
     fs::create_dir(PATH)?;
     let _ = fs::File::create(PASSWORDFILE)?;
     let _ = fs::File::create(LOGFILE)?;
-    println!("[+] Database created successfully!");
 
     log!("Database created successfully");
     Ok(())
@@ -81,7 +87,7 @@ fn display_stored_credentials(entry: Option<String>) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+                println!("[!] No records were found!\nTry 'rustsafe add' to create a new record");
                 return;
             } },
         Err(err) => {
@@ -184,7 +190,7 @@ fn update_existing_credential(search: String) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+                println!("[!] No records were found!\nTry 'rustsafe add' to create a new record");
                 return;
             }
         },
@@ -232,7 +238,7 @@ fn update_existing_credential(search: String) {
     print!("[+] Do you want to change this record ? (Y/n) : ");
     let choice = vault::fgets().to_lowercase();
     
-    if !choice.is_empty() && choice.starts_with('n') {
+    if choice.is_empty() || choice.starts_with('n') {
         println!("[#] Record Wasnt Updated!");
         return;
     }
@@ -291,7 +297,7 @@ fn update_master_password() {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+                println!("[!] No records were found!\nTry 'rustsafe add' to create a new record");
                 return;
             }
         },
@@ -344,7 +350,7 @@ fn remove_existing_credential(search: String) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+                println!("[!] No records were found!\nTry 'rustsafe add' to create a new record");
                 return;
             }
         },
@@ -357,52 +363,52 @@ fn remove_existing_credential(search: String) {
         }
     };
     
-    let mut req_record: Option<(usize, &vault::Record)> = None;
+    let mut req_records: Vec<(usize, &vault::Record)> = Vec::new();
 
     for (idx, record) in records.iter().enumerate() {
         if record.username().contains(&search) || (*record).entry().contains(&search) {
-            req_record = Some((idx, record));
-            break;
+            req_records.push((idx, record));
+            continue;
         }
 
         if let Some(_email) = record.email() {
             if _email.contains(&search) {
-                req_record = Some((idx, record));
-                break;
+                req_records.push((idx, record));
+                continue;
             }
         }
 
         if let Some(_note) = record.note() {
             if _note.contains(&search) {
-                req_record = Some((idx, record));
-                break;
+                req_records.push((idx, record));
+                continue;
             }
         }
     }
 
-    if let None = req_record {
+    if req_records.len() == 0 {
         println!("[!] No Records were found with that phrase '{}'", search);
         log!("Password deletion no password's were found with the phrase '{}'", search);
         return;
     }
     
-    let (idx, record) = req_record.unwrap();
-    vault::record_fmt(vault::RecordPrint::RECORD(record.clone()));
-    
-    print!("[+] Do you want to delete this record ? (Y/n) : ");
-    let choice = vault::fgets().to_lowercase();
-    
-    if !choice.is_empty() && choice.starts_with('n') {
+    for (idx, record) in &req_records {
+        vault::record_fmt(vault::RecordPrint::RECORD((*record).clone()));
+
+        print!("[+] Do you want to delete this record ? (Y/n) : ");
+        let choice = vault::fgets().to_lowercase();
+
+        if choice.starts_with('y') {
+            records.remove(*idx);
+            println!("[+] Record was Deleted!");
+            log!("Record was Deleted");
+            break;
+        }
+
         println!("[#] Record Wasnt Deleted!");
-        return;
     }
-    
-    records.remove(idx);
-    println!("[+] Record was Deleted!");
 
     vault::dump(&records, PASSWORDFILE, &password);
-    
-    log!("Record was Deleted");
 }
 
 fn import_credentials_from_json(path: String) {
@@ -412,7 +418,7 @@ fn import_credentials_from_json(path: String) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+                println!("[!] No records were found!\nTry 'rustsafe add' to create a new record");
                 return;
             }
         },
@@ -431,7 +437,7 @@ fn import_credentials_from_json(path: String) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+                println!("[!] No records were found!\nTry 'rustsafe add' to create a new record");
                 return;
             }
         },
@@ -460,7 +466,7 @@ fn export_credentials_to_json() {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] No records were found!.\nTry 'rustsafe add' to create a new record");
+                println!("[!] No records were found!\nTry 'rustsafe add' to create a new record");
                 return;
             }
         },

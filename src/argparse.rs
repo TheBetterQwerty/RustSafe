@@ -90,27 +90,37 @@ pub fn parse_args(mut args: Args) -> Option<Commands> {
 
 fn helper(prog_name: String, command: Commands) {
     if let Commands::Invalid(cmd) = command {
-        println!("✘ Unknown command '{}'\nTry '{} --help' for usage.", cmd, prog_name);
+        let valid_cmds: Vec<&str> = vec![
+            "--version", "--init", "--add", "--get", "--list", 
+            "--edit", "--rm", "--generate", "--passwd", "--import", "--export"
+        ];
+
+        for valid_cmd in valid_cmds.iter() {
+            if (*valid_cmd).contains(&cmd) {
+                println!("Unknown command '{}'\nSimilar Command '{}' exists", cmd, valid_cmd);
+                return;
+            }
+        }
+
+        println!("Unknown command '{}'\nTry '{} --help' for usage.", cmd, prog_name);
         return;
     }
     
     if let Commands::Help = command {
-    println!(
-r#"Usage:
-  {} <command> [options]
-
-Commands:
-  --version            Displays current version
-  --init               Initiate's the database
-  --add <name>         Add a new password entry
-  --get <name>         Retrieve a password
-  --list               List all saved entries
-  --edit <name>        Edit an entry
-  --rm <name>          Remove an entry
-  --generate <size>    Generate a secure password
-  --passwd             Change master password
-  --import <path>      Import passwords from a file
-  --export             Export saved passwords to a file"#, prog_name);
+        println!("Usage:");
+        println!("  {} <command> [options]\n", prog_name);
+        println!("Commands:");
+        println!("  --version            Displays current version");
+        println!("  --init               Initiates the database");
+        println!("  --add <name>         Add a new password entry");
+        println!("  --get <name>         Retrieve a password");
+        println!("  --list               List all saved entries");
+        println!("  --edit <name>        Edit an entry");
+        println!("  --rm <name>          Remove an entry");
+        println!("  --generate <size>    Generate a secure password");
+        println!("  --passwd             Change master password");
+        println!("  --import <path>      Import passwords from a file");
+        println!("  --export             Export saved passwords to a file");
     }
 }
 
