@@ -1,6 +1,6 @@
 [package]
 name = "RustSafe"
-version = "1.4.3"
+version = "1.5"
 edition = "2024"
 
 [[bin]]
