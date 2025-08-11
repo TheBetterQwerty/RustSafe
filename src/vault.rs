@@ -14,7 +14,7 @@ use aes_gcm::{
 };
 use tabled::{
     Tabled, Table,
-    settings::{Style, Alignment, object::Columns}
+    settings::{Width, Alignment, object::Columns}
 };
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -43,6 +43,7 @@ pub enum RecordPrint {
 }
 
 type HmacSha256 = Hmac<Sha256>;
+const WRAP_WIDTH: usize = 40;
 
 impl Record {
     pub fn new(data: &[String], key: &str) -> Self {
@@ -195,7 +196,7 @@ impl Record {
 
 impl TabledData {
     fn new(data: Record) -> Self {
-        let null = String::from("Null");
+        let null = String::from("null");
         TabledData { 
             entry: data.entry(), username: data.username(), password: data.password(), 
             email: data.email().unwrap_or(null.clone()), note: data.note().unwrap_or(null.clone())
@@ -205,7 +206,8 @@ impl TabledData {
 
 pub fn record_fmt(data: RecordPrint) {
     let mut tabled_data: Vec<TabledData> = Vec::new();
-    
+    // fix the word wrapping and change it to when editing a password or deletion is done the
+    // password is encoded   
     match data {
         RecordPrint::VECTOR(records) => {
             for record in records {
@@ -214,10 +216,13 @@ pub fn record_fmt(data: RecordPrint) {
         },
         RecordPrint::RECORD(record) => tabled_data.push(TabledData::new(record)),
     }
-
+    
     let mut tabled_data = Table::new(tabled_data);
-    tabled_data.with(Style::rounded());
-    tabled_data.modify(Columns::first(), Alignment::right());
+    use tabled::settings::Modify;
+    tabled_data
+        .with(Modify::new(Columns::new(..)).with(Width::wrap(WRAP_WIDTH)))
+        .with(Modify::new(Columns::new(..)).with(Alignment::left()));
+
     println!("{}", tabled_data);
 }
 
