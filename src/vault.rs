@@ -220,7 +220,7 @@ pub fn record_fmt(data: RecordPrint) {
     let mut tabled_data = Table::new(tabled_data);
     use tabled::settings::Modify;
     tabled_data
-        .with(Modify::new(Columns::new(..)).with(Width::wrap(WRAP_WIDTH)))
+        .with(Modify::new(Columns::new(..)).with(Width::wrap(WRAP_WIDTH).keep_words(true)))
         .with(Modify::new(Columns::new(..)).with(Alignment::left()));
 
     println!("{}", tabled_data);
