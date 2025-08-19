@@ -1,5 +1,5 @@
 /* Imports */
-use std::{fs, io::{self, Write}, env};
+use std::{fs, io::{self}, env};
 use rpassword;
 
 /* Modules */
@@ -8,10 +8,9 @@ mod logger;
 mod argparse;
 
 /* Constants */
-const PATH: &str = "/home/qwerty/.rustsafe";
-const PASSWORDFILE: &str = "/home/qwerty/.rustsafe/dump.json";
-const LOGFILE: &str = "/home/qwerty/.rustsafe/log";
-const EXPORTFILE: &str = "/home/qwerty/desktop/export.json";
+const PATH: &'static str = "/home/qwerty/.rustsafe";
+const PASSWORDFILE: &'static str = "/home/qwerty/.rustsafe/dump.json";
+const EXPORTFILE: &'static str = "/home/qwerty/desktop/export.json";
 
 type Commands = argparse::Commands;
 
@@ -44,13 +43,8 @@ fn main() {
                         return;
                     }
                     
-                    match logger::start_logger(LOGFILE) {
-                        Some(milli) => {
-                            let time: f64 = ((milli as f64) / 1000.0) / 60.0 ;
-                            println!("[+] You are banned for {} minutes", time);
-                            return;
-                        },
-                        None => {}
+                    if let false = log!() {
+                        return;
                     }
 
                     match cmd {
@@ -74,9 +68,9 @@ fn main() {
 fn initialize_database() -> io::Result<()> {
     fs::create_dir(PATH)?;
     let _ = fs::File::create(PASSWORDFILE)?;
-    let _ = fs::File::create(LOGFILE)?;
 
-    log!("Database created successfully");
+    let _ = log!();
+    log!(INFO, "DataBase Created");
     Ok(())
 }
 
@@ -93,7 +87,7 @@ fn display_stored_credentials(entry: Option<String>) {
         Err(err) => {
             if err.contains("[!] Error decrypting message") {
                 println!("[!] Incorrect Password");
-                logger::give_ban();
+                log!(INVALID, "Incorrect Password");
             }
             return;
         }
@@ -101,6 +95,7 @@ fn display_stored_credentials(entry: Option<String>) {
     
     if let None = entry {        // if list is called
         vault::record_fmt(vault::RecordPrint::VECTOR(records));
+        log!(INFO, "All Records were viewed");
         return;
     }
     
@@ -136,7 +131,7 @@ fn display_stored_credentials(entry: Option<String>) {
         return;
     }
     
-    log!("Records were viewed");
+    log!(INFO, "Records were viewed");
 }
 
 fn store_new_credential(entry: String) {
@@ -152,7 +147,7 @@ fn store_new_credential(entry: String) {
         Err(err) => {
             if err.contains("[!] Error decrypting message") {
                 println!("[!] Incorrect Password");
-                logger::give_ban();
+                log!(INVALID, "Incorrect Password");
             }
             return;
         }
@@ -180,7 +175,7 @@ fn store_new_credential(entry: String) {
     vault::dump(&records, PASSWORDFILE, &password);
     
     println!("[+] Credentials was stored into the database!");
-    log!("New record was added to the database");
+    log!(INFO, "New record was added to the database");
 }
 
 fn update_existing_credential(search: String) {
@@ -197,7 +192,7 @@ fn update_existing_credential(search: String) {
         Err(err) => {
             if err.contains("[!] Error decrypting message") {
                 println!("[!] Incorrect Password");
-                logger::give_ban();
+                log!(INVALID, "Incorrect Password");
             }
             return;
         }
@@ -228,7 +223,7 @@ fn update_existing_credential(search: String) {
 
     if let None = req_record {
         println!("[!] No Records were found with that phrase '{}'", search);
-        log!("Password updation no password's were found with the phrase '{}'", search);
+        log!(INFO, format!("Password updation failed no password's were found with the phrase '{}'", search));
         return;
     }
     
@@ -286,7 +281,7 @@ fn update_existing_credential(search: String) {
 
         vault::dump(&records, PASSWORDFILE, &password);
 
-        log!("Credentials was updated with the phrase '{}'", search);
+        log!(INFO, format!("Credentials was updated with the phrase '{}'", search));
     }   
 }
 
@@ -304,7 +299,7 @@ fn update_master_password() {
         Err(err) => {
             if err.contains("[!] Error decrypting message") {
                 println!("[!] Incorrect Password");
-                logger::give_ban();
+                log!(INVALID, "Incorrect Password");
             }
             return;
         }
@@ -340,7 +335,7 @@ fn update_master_password() {
     vault::dump(&new_records, PASSWORDFILE, &_password);
 
     println!("[+] Master password was changed successfully!");
-    log!("Master password was changed");
+    log!(INFO, "Master password was changed");
 }
 
 fn remove_existing_credential(search: String) {
@@ -357,7 +352,7 @@ fn remove_existing_credential(search: String) {
         Err(err) => {
             if err.contains("[!] Error decrypting message") {
                 println!("[!] Incorrect Password");
-                logger::give_ban();
+                log!(INVALID, "Incorrect Password");
             }
             return;
         }
@@ -388,7 +383,7 @@ fn remove_existing_credential(search: String) {
 
     if req_records.len() == 0 {
         println!("[!] No Records were found with that phrase '{}'", search);
-        log!("Password deletion no password's were found with the phrase '{}'", search);
+        log!(INFO, format!("Password deletion failed no password's were found with the phrase '{}'", search));
         return;
     }
     
@@ -401,7 +396,7 @@ fn remove_existing_credential(search: String) {
         if choice.starts_with('y') {
             records.remove(*idx);
             println!("[+] Record was Deleted!");
-            log!("Record was Deleted");
+            log!(INFO, "Record was Deleted");
             break;
         }
 
@@ -425,7 +420,7 @@ fn import_credentials_from_json(path: String) {
         Err(err) => {
             if err.contains("[!] Error decrypting message") {
                 println!("[!] Incorrect Password");
-                logger::give_ban();
+                log!(INVALID, "Incorrect Password");
             }
             return;
         }
@@ -456,7 +451,7 @@ fn import_credentials_from_json(path: String) {
     vault::dump(&records, PASSWORDFILE, &password);
     println!("[+] Passwords were imported successfully from {}", path);
 
-    log!("Passwords were imported successfully from {}", path);
+    log!(INFO, format!("Passwords were imported successfully from {}", path));
 }
 
 fn export_credentials_to_json() {
@@ -473,7 +468,7 @@ fn export_credentials_to_json() {
         Err(err) => {
             if err.contains("[!] Error decrypting message") {
                 println!("[!] Incorrect Password");
-                logger::give_ban();
+                log!(INVALID, "Incorrect Password");
             }
             return;
         }
@@ -482,6 +477,6 @@ fn export_credentials_to_json() {
     vault::dump(&records, EXPORTFILE, &password);
     println!("[+] Record was exported to '{}'", EXPORTFILE);
 
-    log!("Record was exported to '{}'", EXPORTFILE);
+    log!(INFO, format!("Record was exported to '{}'", EXPORTFILE));
 }
 

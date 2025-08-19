@@ -1,122 +1,159 @@
-/* IMPORTS */
-use std::fs::{File, OpenOptions};
 use std::sync::Mutex;
-use std::io::{Seek, SeekFrom, Write, Read};
+use std::fs::File;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::io::{Read, Write};
 
-/* GLOBAL VAR'S */
-pub static LOGGER: Mutex<Option<File>> = Mutex::new(None);
-const SIZE: usize = 300;
-const BAN: &str = "You are banned for 5 minutes";
-const BAN_TIME: u128 = 3_00_000; // 5 minutes
-
-pub fn start_logger(path: &str) -> Option<u128> {
-    {
-        let file = match OpenOptions::new().read(true).write(true).create(true).open(path) {
-            Ok(x) => x,
-            Err(x) => panic!("[!] Error: {x}"),
-        };
-
-        let mut logger = LOGGER.lock().unwrap();
-        *logger = Some(file);
-    }
-
-    check_if_banned()
+#[derive(Debug, Clone, PartialEq)]
+pub enum LogType {
+    ERROR,
+    DEBUG,
+    BAN(u128),
+    INVALID,
+    INFO
 }
 
-pub fn check_file() {
-    let mut logger = LOGGER.lock().unwrap();
-    if let Some(ref mut file) = *logger {
-        let mut data: String = String::new();
-        let _ = file.read_to_string(&mut data).unwrap();
-
-        let mut lines: Vec<_> = data
-            .split('\n')
-            .filter(|x| !x.is_empty())
-            .collect();
-
-        if lines.len() >= SIZE {
-            lines.drain(0..(lines.len() - SIZE + 1));
-
-            file.set_len(0).unwrap();
-            file.seek(SeekFrom::Start(0)).unwrap();
-            write!(file, "{}", lines.join("\n")).unwrap();
-        }
-    }
-}
-
-pub fn get_current_time() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis()
-}
-
-pub fn give_ban() {
-    let mut logger = LOGGER.lock().unwrap();
-    if let Some(ref mut file) = *logger {
-        let mut data = String::new();
-        file.seek(SeekFrom::Start(0)).unwrap();
-        file.read_to_string(&mut data).unwrap();
-        
-        let fails = data
-            .split('\n')
-            .rev()
-            .take(5)
-            .filter(|x| x.contains("Login Failed"))
-            .count();
-
-        if fails == 5 {
-            writeln!(file, "{} {}", get_current_time(), BAN).expect("[!] Error writting to logfile");
-            return;
-        }
-
-        writeln!(file, "{} Login Failed", get_current_time()).expect("[!] Error writting to logfile");
-    }
-}
-
-fn check_if_banned() -> Option<u128> {
-    let mut logger = LOGGER.lock().unwrap();
-    if let Some(ref mut file) = *logger {
-        let mut data = String::new();
-        file.seek(SeekFrom::Start(0)).unwrap();
-        file.read_to_string(&mut data).unwrap();
-        
-        let last_log = data
-                .split('\n')
-                .rev()
-                .nth(0)
-                .unwrap();
-        
-        if last_log.contains(BAN) {
-            let lock_time: u128 = last_log
-                .split(' ')
-                .nth(0)
-                .unwrap()
-                .parse()
-                .unwrap_or(0);
-
-            let time_left = get_current_time() - lock_time;
-
-            if time_left > BAN_TIME {
-                return None;
-            }
-            
-            return Some(time_left);
-        }
-    }
-
-    None
-}
+pub static LOG_FILE: Mutex<Option<File>> = Mutex::new(None);
+pub const FILE_NAME: &'static str = "/home/qwerty/.rustsafe/log";
+pub const BAN_TIME: u128 = 5 * 60 * 1000;
+const MAX_FAILS: usize = 5;
+const MAX_LOGS: usize = 500;
 
 #[macro_export]
 macro_rules! log {
-    ($($arg:tt)*) => {
-        logger::check_file();
-        let mut logger = logger::LOGGER.lock().unwrap();
-        if let Some(ref mut file) = *logger {
-            let time = logger::get_current_time();
-            writeln!(file, "{} {}", time, format!($($arg)*)).expect("[!] Error writting to log file!");
+    () => {{
+        use std::fs::OpenOptions;
+        
+        {
+            let file = OpenOptions::new()
+                .read(true)     // for reading last logs
+                .append(true)   // appending only
+                .create(true)   // create if not exists
+                .open(crate::logger::FILE_NAME);
+
+            let mut logger = crate::logger::LOG_FILE.lock().unwrap();
+            *logger = Some(file.unwrap());
         }
+
+        let last_logs = match crate::logger::get_last_logs(5usize) {
+            Some(x) => x,
+            None => Vec::new()
+        };
+        
+        crate::logger::ban_if_invalid(last_logs) // false if banned
+    }};
+
+    ($type:ident, $debug:expr) => {{
+        use std::time::{SystemTime, UNIX_EPOCH};
+        use std::io::Write;
+        
+        let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(time) => time.as_millis(),
+            Err(_) => panic!("[!] Error: SytemTime Before UNIX_EPOCH"),
+        };
+        let log_type = $crate::logger::LogType::$type;
+
+        if let Some(ref mut file) = *crate::logger::LOG_FILE.lock().unwrap() {
+            let _ = writeln!(file, "{} {:?} {}", time, log_type, $debug);
+        }
+    }};
+}
+
+fn give_ban() {
+    let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(time) => time.as_millis(),
+        Err(_) => panic!("[!] Error: SytemTime Before UNIX_EPOCH"),
     };
+    
+    if let Some(ref mut file) = *LOG_FILE.lock().unwrap() {
+        let _ = writeln!(file, "{} BAN User Banned for {} milliseconds", time, BAN_TIME);
+    }
+
+    println!(
+        "[?] You have been banned for {} minutes.\nPlease wait until your ban expires before trying again.",
+        (BAN_TIME / (1000 * 60))
+    );
+}
+
+pub fn ban_if_invalid(logs: Vec<LogType>) -> bool {
+    // false if banned
+    let i = logs.iter().filter(|x| **x == LogType::INVALID).count();
+    if i == MAX_FAILS {
+        give_ban();
+        return false;
+    }
+
+    let last_log = logs.last().unwrap_or(&LogType::DEBUG);
+    if let Some(time) = time_till_unban(last_log) {
+        println!(
+            "[?] You are still banned. Time remaining: {} minutes and {} seconds.",
+            (time / (1000 * 60)),
+            (time / 1000) % 60
+        );
+        return false;
+    }
+
+    true
+}
+
+pub fn get_last_logs(n: usize) -> Option<Vec<LogType>> {
+    let mut buffer = String::new();
+    if let Some(ref mut file) = *LOG_FILE.lock().unwrap() {
+        file.read_to_string(&mut buffer).unwrap();
+    }
+    
+    let mut str_logs: Vec<_> = buffer.lines().collect();
+
+    let logs: Vec<_> = str_logs
+        .iter()
+        .map(|x| {
+            if x.contains("ERROR") {
+                return LogType::ERROR;
+            }
+            if x.contains("DEBUG") {
+                return LogType::DEBUG;
+            }
+            if x.contains("BAN") {
+                if let Some(time) = x.split_whitespace().nth(0) {
+                    if let Ok(_t) = time.parse::<u128>() {
+                        return LogType::BAN(_t);
+                    }
+                }
+            }
+            if x.contains("INFO") {
+                return LogType::INFO;
+            }
+            LogType::INVALID
+        })
+        .collect();
+
+    let len = logs.len();
+    if len == 0 {
+        return None;
+    }
+    
+    if len > MAX_LOGS {
+        let n_elements = len - MAX_LOGS;
+        str_logs.drain(0..n_elements);
+        if let Ok(mut file) = File::create(FILE_NAME) {
+            for log in str_logs {
+                let _ = writeln!(file, "{}", log);
+            }
+        }
+    }
+
+    let start = len.saturating_sub(n);
+    Some(logs[start..].to_vec())
+}
+
+pub fn time_till_unban(log: &LogType) -> Option<u128> {
+    if let LogType::BAN(time) = log {
+        let max_ban_time = time + BAN_TIME;
+        let current_time = match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(time) => time.as_millis(),
+            Err(x) => panic!("[!] Error: {x}")
+        };
+
+        return max_ban_time.checked_sub(current_time);
+    }
+    None
 }
