@@ -1,7 +1,8 @@
-use std::sync::Mutex;
-use std::fs::File;
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::io::{Read, Write};
+use std::{
+    sync::Mutex, fs::File,
+    time::{SystemTime, UNIX_EPOCH},
+    io::{Read, Write}
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LogType {

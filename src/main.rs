@@ -1,5 +1,5 @@
 /* Imports */
-use std::{fs, io::{self}, env};
+use std::{fs, io::Result, env};
 use rpassword;
 
 /* Modules */
@@ -26,7 +26,10 @@ fn main() {
 
                     match initialize_database() {
                         Ok(()) => println!("[+] Database created successfully"),
-                        Err(x) => println!("[!] Error: {x}")
+                        Err(x) => { 
+                            println!("[!] Error: {x}");
+                            log!(ERROR, x.to_string());
+                        }
                     }
                 },
 
@@ -44,6 +47,7 @@ fn main() {
                     }
                     
                     if let false = log!() {
+                        // user is banned probably
                         return;
                     }
 
@@ -65,7 +69,7 @@ fn main() {
     };
 }
 
-fn initialize_database() -> io::Result<()> {
+fn initialize_database() -> Result<()> {
     fs::create_dir(PATH)?;
     let _ = fs::File::create(PASSWORDFILE)?;
 
@@ -310,6 +314,7 @@ fn update_master_password() {
  
     if passwd != _password {
         println!("[!] Passwords doesn't match!");
+        log!(INFO, "Master Password change failed, Passwords doesnt match");
         return;
     }
     

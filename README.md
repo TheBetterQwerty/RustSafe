@@ -38,11 +38,8 @@
 * **Local-Only Storage**
   Passwords are stored only on the local file system in encrypted form. No network access is required or used.
 
----
-
-## Issues
-
-* Rate Limiting Not Working 
+* **Rate-Limiting**
+  If user enters incorrect password then they are locked for 5 minutes (customizable)
 
 ---
 
