@@ -26,26 +26,26 @@ fn main() {
 
                     match initialize_database() {
                         Ok(()) => println!("[+] Database created successfully"),
-                        Err(x) => { 
+                        Err(x) => {
                             println!("[!] Error: {x}");
                             log!(ERROR, x.to_string());
                         }
                     }
                 },
 
-                Commands::Generate(size) => println!("Generated Password -> {}", vault::generate_rand_password(size)),  
+                Commands::Generate(size) => println!("Generated Password -> {}", vault::generate_rand_password(size)),
 
                 _ => {
 
                     if !fs::exists(PATH).unwrap() {
-                        println!("[!] Database isn't created.\nTry '{} init' to create a database", 
+                        println!("[!] Database isn't created.\nTry '{} init' to create a database",
                             env::args()
                                 .nth(0)
                                 .unwrap_or("".to_string())
                         );
                         return;
                     }
-                    
+
                     if let false = log!() {
                         // user is banned probably
                         return;
@@ -80,7 +80,7 @@ fn initialize_database() -> Result<()> {
 
 fn display_stored_credentials(entry: Option<String>) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
-    
+
     let records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
         Ok(y) => match y {
             Some(x) => x,
@@ -96,23 +96,23 @@ fn display_stored_credentials(entry: Option<String>) {
             return;
         }
     };
-    
+
     if let None = entry {        // if list is called
         vault::record_fmt(vault::RecordPrint::VECTOR(records));
         log!(INFO, "All Records were viewed");
         return;
     }
-    
+
     let search = entry.unwrap_or(String::from(""));
     let mut found = false;
-    
+
     for record in records {
         if record.entry().contains(&search) || record.username().contains(&search) {
             vault::record_fmt(vault::RecordPrint::RECORD(record));
             found = true;
             break;
         }
-        
+
         if let Some(_email) = record.email() {
             if _email.contains(&search) {
                 vault::record_fmt(vault::RecordPrint::RECORD(record));
@@ -134,7 +134,7 @@ fn display_stored_credentials(entry: Option<String>) {
         println!("[!] Record with '{}' doesn't exists", search);
         return;
     }
-    
+
     log!(INFO, "Records were viewed");
 }
 
@@ -159,7 +159,7 @@ fn store_new_credential(entry: String) {
 
     print!("[+] Enter username for '{}': ", entry);
     data.push(vault::fgets());
-    
+
     print!("[+] Enter password for '{}' (on empty creates a safe password of length 30) : ", entry);
     let mut pass: String = vault::fgets();
     if pass.is_empty() {
@@ -170,21 +170,21 @@ fn store_new_credential(entry: String) {
 
     print!("[+] Enter email for '{}' (optional): ", entry);
     data.push(vault::fgets());
-    
+
     print!("[+] Enter note for '{}' (optional): ", entry);
     data.push(vault::fgets());
 
     records.push(vault::Record::new(&data, &password));
-    
+
     vault::dump(&records, PASSWORDFILE, &password);
-    
+
     println!("[+] Credentials was stored into the database!");
     log!(INFO, "New record was added to the database");
 }
 
 fn update_existing_credential(search: String) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
-    
+
     let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
         Ok(y) => match y {
             Some(x) => x,
@@ -201,7 +201,7 @@ fn update_existing_credential(search: String) {
             return;
         }
     };
-    
+
     let mut req_record: Option<(usize, &vault::Record)> = None;
 
     for (idx, record) in records.iter().enumerate() {
@@ -230,13 +230,13 @@ fn update_existing_credential(search: String) {
         log!(INFO, format!("Password updation failed no password's were found with the phrase '{}'", search));
         return;
     }
-    
+
     let (idx, record) = req_record.unwrap();
     vault::record_fmt(vault::RecordPrint::RECORD(record.clone()));
-    
+
     print!("[+] Do you want to change this record ? (Y/n) : ");
     let choice = vault::fgets().to_lowercase();
-    
+
     if choice.is_empty() || choice.starts_with('n') {
         println!("[#] Record Wasnt Updated!");
         return;
@@ -256,7 +256,7 @@ fn update_existing_credential(search: String) {
 
         print!("[+] Enter new email for '{}' (optional): ", (*record).entry());
         let _e = vault::fgets();
-        if _e.is_empty() { 
+        if _e.is_empty() {
             if let Some(_email) = (*record).email() {
                 data.push(_email);
             } else {
@@ -268,7 +268,7 @@ fn update_existing_credential(search: String) {
 
         print!("[+] Enter new note for '{}' (optional): ", (*record).entry());
         let _n = vault::fgets();
-        if _n.is_empty() { 
+        if _n.is_empty() {
             if let Some(_note) = (*record).note() {
                 data.push(_note);
             } else {
@@ -277,7 +277,7 @@ fn update_existing_credential(search: String) {
         } else {
             data.push(_n);
         }
-        
+
         println!("{:?}", data);
         records[idx] = vault::Record::new(&data, &password);
 
@@ -286,7 +286,7 @@ fn update_existing_credential(search: String) {
         vault::dump(&records, PASSWORDFILE, &password);
 
         log!(INFO, format!("Credentials was updated with the phrase '{}'", search));
-    }   
+    }
 }
 
 fn update_master_password() {
@@ -308,16 +308,16 @@ fn update_master_password() {
             return;
         }
     };
-    
+
     let passwd: String = rpassword::prompt_password("[+] Enter new master password: ").unwrap();
     let _password: String = rpassword::prompt_password("[+] Enter new master password again: ").unwrap();
- 
+
     if passwd != _password {
         println!("[!] Passwords doesn't match!");
         log!(INFO, "Master Password change failed, Passwords doesnt match");
         return;
     }
-    
+
     let mut new_records: Vec<vault::Record> = Vec::new();
     for record in records {
         let mut data = vec![record.entry(), record.username(), record.password()];
@@ -345,7 +345,7 @@ fn update_master_password() {
 
 fn remove_existing_credential(search: String) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
-    
+
     let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
         Ok(y) => match y {
             Some(x) => x,
@@ -362,7 +362,7 @@ fn remove_existing_credential(search: String) {
             return;
         }
     };
-    
+
     let mut req_records: Vec<(usize, &vault::Record)> = Vec::new();
 
     for (idx, record) in records.iter().enumerate() {
@@ -391,7 +391,7 @@ fn remove_existing_credential(search: String) {
         log!(INFO, format!("Password deletion failed no password's were found with the phrase '{}'", search));
         return;
     }
-    
+
     for (idx, record) in &req_records {
         vault::record_fmt(vault::RecordPrint::RECORD((*record).clone()));
 
@@ -413,13 +413,13 @@ fn remove_existing_credential(search: String) {
 
 fn import_credentials_from_json(path: String) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
-    
+
     let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] No records were found!\nTry 'rustsafe add' to create a new record");
-                return;
+                println!("[$] 0 passwords found in local database");
+                Vec::new()
             }
         },
         Err(err) => {
@@ -437,7 +437,7 @@ fn import_credentials_from_json(path: String) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] No records were found!\nTry 'rustsafe add' to create a new record");
+                println!("[!] 0 records were found in the foreign database!\nTry 'rustsafe add' to create a new record");
                 return;
             }
         },
@@ -461,7 +461,7 @@ fn import_credentials_from_json(path: String) {
 
 fn export_credentials_to_json() {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
-    
+
     let records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
         Ok(y) => match y {
             Some(x) => x,
