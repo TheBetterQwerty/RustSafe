@@ -433,7 +433,7 @@ fn import_credentials_from_json(path: String) {
 
     let foreign_passwd = rpassword::prompt_password("[+] Enter the password of the foreign json file: ").unwrap();
 
-    let foreign_records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &foreign_passwd) {
+    let foreign_records: Vec<vault::Record> = match vault::load(&path, &foreign_passwd) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
@@ -466,7 +466,7 @@ fn export_credentials_to_json() {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] No records were found!\nTry 'rustsafe add' to create a new record");
+                println!("[!] No records were found to export!\nTry 'rustsafe add' to create a new record");
                 return;
             }
         },
