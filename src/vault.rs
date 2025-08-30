@@ -6,7 +6,7 @@ use hmac::{Mac, Hmac};
 use hmac::digest::KeyInit as HmacKeyInit;
 use sha2::{Sha256, Digest};
 use rand::{
-    rng, random, 
+    rng, random,
     distr::{Alphanumeric, SampleString}
 };
 use aes_gcm::{
@@ -53,7 +53,7 @@ impl Record {
 
         let bytes: Vec<u8> = (0..12).map(|_| { random::<u8>() }).collect();
         let salt = encode(&bytes);
-        
+
         /* key = hash(salt[..12] + key + salt[12..]) */
         let mut key_byte = String::new();
         key_byte.push_str(&salt[..12]);
@@ -65,7 +65,7 @@ impl Record {
         for x in data {
             mac.update(x.as_bytes());
         }
-        
+
         Record {
             salt,
             entry: data[0].clone(),
@@ -90,14 +90,14 @@ impl Record {
             Ok(x) => x,
             Err(x) => panic!("[!] Error encrypting: {x}"),
         };
-        
+
         if let Some(_email) = &self.email {
             email = match encrypt(key, &_email, &nonce) {
                 Ok(x) => Some(x),
                 Err(x) => panic!("[!] Error encrypting: {x}"),
             };
         }
-        
+
         if let Some(_note) = &self.note {
             note = match encrypt(key, &_note, &nonce) {
                 Ok(x) => Some(x),
@@ -112,7 +112,7 @@ impl Record {
             password,
             email,
             note,
-            hmac: self.hmac.clone(), // same hmac 
+            hmac: self.hmac.clone(), // same hmac
         }
     }
 
@@ -122,15 +122,15 @@ impl Record {
         let (mut email, mut note) = (None, None);
 
         let username = match decrypt(key, &self.username, &nonce) {
-            Ok(x) => { 
+            Ok(x) => {
                 mac.update(x.as_bytes());
                 x
             },
             Err(x) => return Err(x),
         };
-       
+
         let password = match decrypt(key, &self.password, &nonce) {
-            Ok(x) => { 
+            Ok(x) => {
                 mac.update(x.as_bytes());
                 x
             },
@@ -139,20 +139,20 @@ impl Record {
 
         if let Some(_email) = &self.email {
             email = match decrypt(key, &_email, &nonce) {
-                Ok(x) => { 
+                Ok(x) => {
                     mac.update(x.as_bytes());
                     Some(x)
                 },
                 Err(x) => return Err(x),
             };
         }
-        
+
         if let Some(_note) = &self.note {
             note = match decrypt(key, &_note, &nonce) {
-                Ok(x) => { 
+                Ok(x) => {
                     mac.update(x.as_bytes());
                     Some(x)
-                },           
+                },
                 Err(x) => return Err(x),
             };
         }
@@ -171,7 +171,7 @@ impl Record {
             hmac: self.hmac.clone(),
         })
     }
-    
+
     // entry username email note
     pub fn entry(&self) -> String {
         self.entry.clone()
@@ -197,8 +197,8 @@ impl Record {
 impl TabledData {
     fn new(data: Record) -> Self {
         let null = String::from("null");
-        TabledData { 
-            entry: data.entry(), username: data.username(), password: data.password(), 
+        TabledData {
+            entry: data.entry(), username: data.username(), password: data.password(),
             email: data.email().unwrap_or(null.clone()), note: data.note().unwrap_or(null.clone())
         }
     }
@@ -207,7 +207,7 @@ impl TabledData {
 pub fn record_fmt(data: RecordPrint) {
     let mut tabled_data: Vec<TabledData> = Vec::new();
     // fix the word wrapping and change it to when editing a password or deletion is done the
-    // password is encoded   
+    // password is encoded
     match data {
         RecordPrint::VECTOR(records) => {
             for record in records {
@@ -216,7 +216,7 @@ pub fn record_fmt(data: RecordPrint) {
         },
         RecordPrint::RECORD(record) => tabled_data.push(TabledData::new(record)),
     }
-    
+
     let mut tabled_data = Table::new(tabled_data);
     use tabled::settings::Modify;
     tabled_data
@@ -294,11 +294,11 @@ pub fn fgets() -> String {
     let mut input = String::new();
     let _ = io::stdout().flush();
     io::stdin().read_line(&mut input).expect("[!] Error reading from stdin!");
-    
+
     return input.trim().to_owned();
 }
 
-fn hash256(text: &String) -> [u8; 32] { 
+fn hash256(text: &String) -> [u8; 32] {
     let res = Sha256::digest(text.as_bytes());
     let mut bytes = [0u8; 32];
     bytes.copy_from_slice(&res);
@@ -307,7 +307,7 @@ fn hash256(text: &String) -> [u8; 32] {
 
 fn encrypt(key: &[u8], plaintext: &String, nonce: &[u8]) -> Result<String, String> {
     let key = Key::<Aes256Gcm>::from_slice(key);
-    let nonce = Nonce::from_slice(nonce); // nonce must be a 12 byte shit 
+    let nonce = Nonce::from_slice(nonce); // nonce must be a 12 byte shit
     let cipher = Aes256Gcm::new(key);
 
     let ciphertext = match cipher.encrypt(nonce, (*plaintext).as_bytes()) {
@@ -322,7 +322,7 @@ fn encrypt(key: &[u8], plaintext: &String, nonce: &[u8]) -> Result<String, Strin
 
 fn decrypt(key: &[u8], ciphertext: &String, nonce: &[u8]) -> Result<String, String> {
     let key = Key::<Aes256Gcm>::from_slice(key);
-    let nonce = Nonce::from_slice(nonce); // nonce must be a 12 byte shit 
+    let nonce = Nonce::from_slice(nonce); // nonce must be a 12 byte shit
     let cipher = Aes256Gcm::new(key);
     let ciphertext = match decode(ciphertext) {
         Ok(x) => x,
@@ -337,6 +337,6 @@ fn decrypt(key: &[u8], ciphertext: &String, nonce: &[u8]) -> Result<String, Stri
             return Err(format!("[!] Error decrypting message: {}", x));
         },
     };
- 
+
     return Ok(String::from_utf8_lossy(&plaintext).to_string());
 }
