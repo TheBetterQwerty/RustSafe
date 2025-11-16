@@ -1,14 +1,15 @@
 use serde::{Serialize, Deserialize};
-use std::io::{self, Write};
-use std::fs;
+use std::{
+    fs, io::{self, Write},
+};
 use hex::{encode, decode};
 use hmac::{Mac, Hmac};
 use hmac::digest::KeyInit as HmacKeyInit;
 use sha2::{Sha256, Digest};
 use rand::{
-    rng, random,
-    distr::{Alphanumeric, SampleString}
+    random, rng, seq::IndexedRandom
 };
+use rand::seq::SliceRandom;
 use aes_gcm::{
     aead::Aead, Aes256Gcm, Key, Nonce,
 };
@@ -287,7 +288,55 @@ pub fn dump(records: &[Record], path: &str, key: &str) {
 }
 
 pub fn generate_rand_password(size: usize) -> String {
-    Alphanumeric.sample_string(&mut rng(), size)
+    /* must pass these test
+    * -> Contain both upper and lowercase and number
+    * -> Constains special chars
+    * */
+
+    let upper_case: Vec<char> = ('A'..='Z').collect();
+    let lower_case: Vec<char> = ('a'..='z').collect();
+    let numbers: Vec<char> = ('0'..='9').collect();
+    let special_chars: Vec<char> = vec![
+        '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', ':', '}', '{', '[', ']'
+    ];
+
+    let mut password: Vec<char> = Vec::new();
+
+    let least_len = (size as f64 * 0.25) as usize;
+
+    password.extend(
+        upper_case
+            .choose_multiple(&mut rng(), least_len)
+            .cloned()
+    );
+
+    password.extend(
+        lower_case
+            .choose_multiple(&mut rng(), least_len)
+            .cloned()
+    );
+
+    password.extend(
+        numbers
+            .choose_multiple(&mut rng(), least_len)
+            .cloned()
+    );
+
+    password.extend(
+        special_chars
+            .choose_multiple(&mut rng(), least_len)
+            .cloned()
+    );
+
+    password.extend(
+        lower_case
+            .choose_multiple(&mut rng(), (size - (least_len * 4)) as usize)
+            .cloned()
+    );
+
+    password.shuffle(&mut rng());
+
+    password.into_iter().collect()
 }
 
 pub fn fgets() -> String {

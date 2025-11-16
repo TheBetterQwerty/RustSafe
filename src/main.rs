@@ -1,5 +1,6 @@
 /* Imports */
 use std::{fs, io::Result, env};
+use std::sync::OnceLock;
 use rpassword;
 
 /* Modules */
@@ -8,18 +9,24 @@ mod logger;
 mod argparse;
 
 /* Constants */
-const PATH: &'static str = "/home/qwerty/.rustsafe";
-const PASSWORDFILE: &'static str = "/home/qwerty/.rustsafe/dump.json";
-const EXPORTFILE: &'static str = "/home/qwerty/desktop/export.json";
+static PATH: OnceLock<String> = OnceLock::new();
+static PASSWORDFILE: OnceLock<String> = OnceLock::new();
+static EXPORTFILE: OnceLock<String> = OnceLock::new();
+static LOG_FILE: OnceLock<String> = OnceLock::new();
 
 type Commands = argparse::Commands;
 
 fn main() {
+    if let None = set_paths() {
+        println!("[!] Error: In setting paths!");
+        return;
+    }
+
     match argparse::parse_args(env::args()) {
         Some(cmd) => {
             match cmd {
                 Commands::Init => {
-                    if fs::exists(PATH).unwrap() {
+                    if fs::exists(PATH.get().unwrap()).unwrap() {
                         println!("[+] DataBase Already Exists!");
                         return;
                     }
@@ -37,7 +44,7 @@ fn main() {
 
                 _ => {
 
-                    if !fs::exists(PATH).unwrap() {
+                    if !fs::exists(PATH.get().unwrap()).unwrap() {
                         println!("[!] Database isn't created.\nTry '{} init' to create a database",
                             env::args()
                                 .nth(0)
@@ -46,7 +53,7 @@ fn main() {
                         return;
                     }
 
-                    if let false = log!() {
+                    if let false = log!(LOG_FILE.get().unwrap()) {
                         // user is banned probably
                         return;
                     }
@@ -69,11 +76,21 @@ fn main() {
     };
 }
 
-fn initialize_database() -> Result<()> {
-    fs::create_dir(PATH)?;
-    let _ = fs::File::create(PASSWORDFILE)?;
+fn set_paths() -> Option<()> {
+    let dir_name = env::home_dir()?;
+    PATH.set(format!("{}/.rustsafe", dir_name.display())).ok()?;
+    PASSWORDFILE.set(format!("{}/.rustsafe/dump.json", dir_name.display())).ok()?;
+    EXPORTFILE.set(format!("{}", dir_name.display())).ok()?;
+    LOG_FILE.set(format!("{}/.rustsafe/log", dir_name.display())).ok()?;
 
-    let _ = log!();
+    Some(())
+}
+
+fn initialize_database() -> Result<()> {
+    fs::create_dir(PATH.get().unwrap())?;
+    let _ = fs::File::create(PASSWORDFILE.get().unwrap())?;
+
+    let _ = log!(LOG_FILE.get().unwrap());
     log!(INFO, "DataBase Created");
     Ok(())
 }
@@ -81,7 +98,7 @@ fn initialize_database() -> Result<()> {
 fn display_stored_credentials(entry: Option<String>) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
-    let records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
+    let records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
@@ -143,7 +160,7 @@ fn store_new_credential(entry: String) {
 
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
-    let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
+    let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password) {
         Ok(y) => match y {
             Some(x) => x,
             None => Vec::new(),
@@ -176,7 +193,7 @@ fn store_new_credential(entry: String) {
 
     records.push(vault::Record::new(&data, &password));
 
-    vault::dump(&records, PASSWORDFILE, &password);
+    vault::dump(&records, PASSWORDFILE.get().unwrap(), &password);
 
     println!("[+] Credentials was stored into the database!");
     log!(INFO, "New record was added to the database");
@@ -185,7 +202,7 @@ fn store_new_credential(entry: String) {
 fn update_existing_credential(search: String) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
-    let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
+    let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
@@ -278,12 +295,11 @@ fn update_existing_credential(search: String) {
             data.push(_n);
         }
 
-        println!("{:?}", data);
         records[idx] = vault::Record::new(&data, &password);
 
         println!("[+] Credentials was updated sucessfully");
 
-        vault::dump(&records, PASSWORDFILE, &password);
+        vault::dump(&records, PASSWORDFILE.get().unwrap(), &password);
 
         log!(INFO, format!("Credentials was updated with the phrase '{}'", search));
     }
@@ -292,7 +308,7 @@ fn update_existing_credential(search: String) {
 fn update_master_password() {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
-    let records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
+    let records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
@@ -337,7 +353,7 @@ fn update_master_password() {
         new_records.push(vault::Record::new(&data, &_password));
     }
 
-    vault::dump(&new_records, PASSWORDFILE, &_password);
+    vault::dump(&new_records, PASSWORDFILE.get().unwrap(), &_password);
 
     println!("[+] Master password was changed successfully!");
     log!(INFO, "Master password was changed");
@@ -346,7 +362,7 @@ fn update_master_password() {
 fn remove_existing_credential(search: String) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
-    let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
+    let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
@@ -408,13 +424,13 @@ fn remove_existing_credential(search: String) {
         println!("[#] Record Wasnt Deleted!");
     }
 
-    vault::dump(&records, PASSWORDFILE, &password);
+    vault::dump(&records, PASSWORDFILE.get().unwrap(), &password);
 }
 
 fn import_credentials_from_json(path: String) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
-    let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
+    let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
@@ -453,7 +469,7 @@ fn import_credentials_from_json(path: String) {
         records.push(record);
     }
 
-    vault::dump(&records, PASSWORDFILE, &password);
+    vault::dump(&records, PASSWORDFILE.get().unwrap(), &password);
     println!("[+] Passwords were imported successfully from {}", path);
 
     log!(INFO, format!("Passwords were imported successfully from {}", path));
@@ -462,7 +478,7 @@ fn import_credentials_from_json(path: String) {
 fn export_credentials_to_json() {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
-    let records: Vec<vault::Record> = match vault::load(PASSWORDFILE, &password) {
+    let records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
@@ -479,9 +495,9 @@ fn export_credentials_to_json() {
         }
     };
 
-    vault::dump(&records, EXPORTFILE, &password);
-    println!("[+] Record was exported to '{}'", EXPORTFILE);
+    vault::dump(&records, EXPORTFILE.get().unwrap(), &password);
+    println!("[+] Record was exported to '{}'", EXPORTFILE.get().unwrap());
 
-    log!(INFO, format!("Record was exported to '{}'", EXPORTFILE));
+    log!(INFO, format!("Record was exported to '{}'", EXPORTFILE.get().unwrap()));
 }
 

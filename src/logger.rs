@@ -14,39 +14,38 @@ pub enum LogType {
 }
 
 pub static LOG_FILE: Mutex<Option<File>> = Mutex::new(None);
-pub const FILE_NAME: &'static str = "/home/qwerty/.rustsafe/log";
 pub const BAN_TIME: u128 = 5 * 60 * 1000;
 const MAX_FAILS: usize = 5;
 const MAX_LOGS: usize = 500;
 
 #[macro_export]
 macro_rules! log {
-    () => {{
+    ($debug: expr) => {{
         use std::fs::OpenOptions;
-        
+
         {
             let file = OpenOptions::new()
                 .read(true)     // for reading last logs
                 .append(true)   // appending only
                 .create(true)   // create if not exists
-                .open(crate::logger::FILE_NAME);
+                .open($debug);
 
             let mut logger = crate::logger::LOG_FILE.lock().unwrap();
             *logger = Some(file.unwrap());
         }
 
-        let last_logs = match crate::logger::get_last_logs(5usize) {
+        let last_logs = match crate::logger::get_last_logs(5usize, $debug) {
             Some(x) => x,
             None => Vec::new()
         };
-        
+
         crate::logger::ban_if_invalid(last_logs) // false if banned
     }};
 
     ($type:ident, $debug:expr) => {{
         use std::time::{SystemTime, UNIX_EPOCH};
         use std::io::Write;
-        
+
         let time = match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(time) => time.as_millis(),
             Err(_) => panic!("[!] Error: SytemTime Before UNIX_EPOCH"),
@@ -64,7 +63,7 @@ fn give_ban() {
         Ok(time) => time.as_millis(),
         Err(_) => panic!("[!] Error: SytemTime Before UNIX_EPOCH"),
     };
-    
+
     if let Some(ref mut file) = *LOG_FILE.lock().unwrap() {
         let _ = writeln!(file, "{} BAN User Banned for {} milliseconds", time, BAN_TIME);
     }
@@ -96,12 +95,12 @@ pub fn ban_if_invalid(logs: Vec<LogType>) -> bool {
     true
 }
 
-pub fn get_last_logs(n: usize) -> Option<Vec<LogType>> {
+pub fn get_last_logs(n: usize, file: &str) -> Option<Vec<LogType>> {
     let mut buffer = String::new();
     if let Some(ref mut file) = *LOG_FILE.lock().unwrap() {
         file.read_to_string(&mut buffer).unwrap();
     }
-    
+
     let mut str_logs: Vec<_> = buffer.lines().collect();
 
     let logs: Vec<_> = str_logs
@@ -131,11 +130,11 @@ pub fn get_last_logs(n: usize) -> Option<Vec<LogType>> {
     if len == 0 {
         return None;
     }
-    
+
     if len > MAX_LOGS {
         let n_elements = len - MAX_LOGS;
         str_logs.drain(0..n_elements);
-        if let Ok(mut file) = File::create(FILE_NAME) {
+        if let Ok(mut file) = File::create(file) {
             for log in str_logs {
                 let _ = writeln!(file, "{}", log);
             }
