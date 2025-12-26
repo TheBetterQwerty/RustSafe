@@ -297,7 +297,7 @@ pub fn generate_rand_password(size: usize) -> String {
     let lower_case: Vec<char> = ('a'..='z').collect();
     let numbers: Vec<char> = ('0'..='9').collect();
     let special_chars: Vec<char> = vec![
-        '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', ':', '}', '{', '[', ']'
+        '!', '@', '#', '$', '%', '&', '*',
     ];
 
     let mut password: Vec<char> = Vec::new();

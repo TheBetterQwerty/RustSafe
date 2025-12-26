@@ -40,7 +40,11 @@ fn main() {
                     }
                 },
 
-                Commands::Generate(size) => println!("Generated Password -> {}", vault::generate_rand_password(size)),
+                Commands::Generate(size) => {
+                    let data: String = format!("Generated Password -> {}", vault::generate_rand_password(size));
+                    println!("{}", data);
+                    log!(INFO, data);
+                },
 
                 _ => {
 
