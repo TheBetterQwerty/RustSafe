@@ -1,4 +1,4 @@
-# Rust-Safe
+# Rust-Safe [1.6.3]
 
 **Rust-Safe** is a secure, lightweight, command-line password manager written in Rust. It is designed for simplicity, local control, and robust cryptographic practices. Passwords are encrypted and stored in a local JSON file, which can be safely exported or imported as needed.
 

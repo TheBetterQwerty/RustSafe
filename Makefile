@@ -11,7 +11,8 @@ build:
 	cargo build --release 
 	strip $(target)
 
-move: 
+move:
+	@echo "Moving the binary to /usr/bin"
 	sudo mv $(target) /usr/bin/$(binary)
 
 clean:
