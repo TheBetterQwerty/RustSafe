@@ -1,5 +1,8 @@
 /* Imports */
-use std::{fs, io::Result, env};
+use std::{
+    fs::{self, OpenOptions}, 
+    io::{Result, Read}, env
+};
 use std::sync::OnceLock;
 use rpassword;
 
@@ -27,7 +30,9 @@ fn main() {
             match cmd {
                 Commands::Init => {
                     if fs::exists(PATH.get().unwrap()).unwrap() {
-                        println!("[+] DataBase Already Exists!");
+                        let val = format!("[+] DataBase Already Exists!");
+                        println!("{}", val);
+                        log!(ERROR, val);
                         return;
                     }
 
@@ -40,6 +45,8 @@ fn main() {
                     }
                 },
 
+                Commands::Logs => print_logs(),
+
                 Commands::Generate(size) => {
                     let data: String = format!("Generated Password -> {}", vault::generate_rand_password(size));
                     println!("{}", data);
@@ -49,7 +56,7 @@ fn main() {
                 _ => {
 
                     if !fs::exists(PATH.get().unwrap()).unwrap() {
-                        println!("[!] Database isn't created.\nTry '{} init' to create a database",
+                        println!("[!] Database isn't created.\nTry '{} --init' to create a database",
                             env::args()
                                 .nth(0)
                                 .unwrap_or("".to_string())
@@ -88,6 +95,26 @@ fn set_paths() -> Option<()> {
     LOG_FILE.set(format!("{}/.rustsafe/log", dir_name.display())).ok()?;
 
     Some(())
+}
+
+fn print_logs() {
+    if !fs::exists(LOG_FILE.get().unwrap()).unwrap() {
+        let val = format!("[!] Error: Log file wasn't created!");
+        println!("{}", val);
+        log!(ERROR, val);
+        return;
+    }
+    
+    let mut file = OpenOptions::new()
+        .read(true)
+        .open(LOG_FILE.get().unwrap())
+        .unwrap();
+    
+    let mut buffer = String::new();
+    let _ = file.read_to_string(&mut buffer).unwrap();
+    println!("{}", buffer);
+
+    log!(INFO, "Logs were viewed")
 }
 
 fn initialize_database() -> Result<()> {

@@ -10,6 +10,7 @@
 | ------------------- | ------------------------------------------ |
 | `--version`         | Current Version of RustSafe                |
 | `--init`            | Initiate's the database                    |
+| `--logs`            | Prints all saved logs                      |
 | `--add <name>`      | Add a new password entry                   |
 | `--get <name>`      | Retrieve a stored password                 |
 | `--list`            | List all saved entries                     |
@@ -49,13 +50,6 @@
 * The encryption key is derived from the user's master password and the hex encoded random nonce is used as the salt with the password.
 * The password file can be exported and imported securely across systems, provided the same master password is used.
 * The master password is required at runtime and never written to disk.
-
----
-
-## Planned Improvements
-
-* **Enhanced Rate Limiting**
-  Solidifying rate-limiting for master password attempts to reduce the risk of brute-force attacks. This will include time-based lockouts.
 
 ---
 

@@ -2,6 +2,7 @@ use std::env::Args;
 
 pub enum Commands {
     Init,
+    Logs,
     Add(String),            // Add new entry
     Get(String),            // Get record based on username or email
     List,                   // Shows all entries
@@ -22,6 +23,8 @@ pub fn parse_args(mut args: Args) -> Option<Commands> {
         Some("--version") | Some("-v") => show_version(),
 
         Some("--init") => return Some(Commands::Init),
+
+        Some("--logs") => return Some(Commands::Logs),
 
         Some("--add") => {
             if let Some(entry) = args.next() {
@@ -91,7 +94,7 @@ pub fn parse_args(mut args: Args) -> Option<Commands> {
 fn helper(prog_name: String, command: Commands) {
     if let Commands::Invalid(cmd) = command {
         let valid_cmds: Vec<&str> = vec![
-            "--version", "--init", "--add", "--get", "--list", 
+            "--version", "--init", "--add", "--get", "--list", "--logs",
             "--edit", "--rm", "--generate", "--passwd", "--import", "--export"
         ];
 
@@ -112,6 +115,7 @@ fn helper(prog_name: String, command: Commands) {
         println!("Commands:");
         println!("  --version            Displays current version");
         println!("  --init               Initiates the database");
+        println!("  --logs               Prints the saved logs");
         println!("  --add <name>         Add a new password entry");
         println!("  --get <name>         Retrieve a password");
         println!("  --list               List all saved entries");

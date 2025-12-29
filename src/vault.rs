@@ -15,7 +15,7 @@ use aes_gcm::{
 };
 use tabled::{
     Tabled, Table,
-    settings::{Width, Alignment, object::Columns}
+    settings::{Style, Width, Alignment, object::Columns}
 };
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -219,6 +219,7 @@ pub fn record_fmt(data: RecordPrint) {
     }
 
     let mut tabled_data = Table::new(tabled_data);
+    tabled_data.with(Style::rounded());
     use tabled::settings::Modify;
     tabled_data
         .with(Modify::new(Columns::new(..)).with(Width::wrap(WRAP_WIDTH).keep_words(true)))
