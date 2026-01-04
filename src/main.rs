@@ -1,6 +1,6 @@
 /* Imports */
 use std::{
-    fs::{self, OpenOptions}, 
+    fs::{self, OpenOptions},
     io::{Result, Read}, env
 };
 use std::sync::OnceLock;
@@ -104,17 +104,19 @@ fn print_logs() {
         log!(ERROR, val);
         return;
     }
-    
-    let mut file = OpenOptions::new()
-        .read(true)
-        .open(LOG_FILE.get().unwrap())
-        .unwrap();
-    
-    let mut buffer = String::new();
-    let _ = file.read_to_string(&mut buffer).unwrap();
-    println!("{}", buffer);
 
-    log!(INFO, "Logs were viewed")
+    {
+        let mut file = OpenOptions::new()
+            .read(true)
+            .open(LOG_FILE.get().unwrap())
+            .unwrap();
+
+        let mut buffer = String::new();
+        let _ = file.read_to_string(&mut buffer).unwrap();
+        println!("{}", buffer);
+    }
+
+    log!(INFO, "Logs were viewed");
 }
 
 fn initialize_database() -> Result<()> {
@@ -133,7 +135,7 @@ fn display_stored_credentials(entry: Option<String>) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] No records were found!\nTry 'rustsafe add' to create a new record");
+                println!("[!] No records were found!\nTry 'rustsafe --add' to create a new record");
                 return;
             } },
         Err(err) => {
@@ -146,43 +148,46 @@ fn display_stored_credentials(entry: Option<String>) {
     };
 
     if let None = entry {        // if list is called
+        if records.is_empty() {
+            println!("[!] No passwords were saved!\nTry 'rustsafe --add' to create a new record");
+            log!(INFO, "All Records were viewed but database empty");
+            return;
+        }
         vault::record_fmt(vault::RecordPrint::VECTOR(records));
         log!(INFO, "All Records were viewed");
         return;
     }
 
     let search = entry.unwrap_or(String::from(""));
-    let mut found = false;
+    let mut found = Vec::new();
 
     for record in records {
         if record.entry().contains(&search) || record.username().contains(&search) {
-            vault::record_fmt(vault::RecordPrint::RECORD(record));
-            found = true;
-            break;
+            found.push(record);
+            continue;
         }
 
         if let Some(_email) = record.email() {
             if _email.contains(&search) {
-                vault::record_fmt(vault::RecordPrint::RECORD(record));
-                found = true;
-                break;
+                found.push(record);
+                continue;
             }
         }
 
         if let Some(note) = record.note() {
             if note.contains(&search) {
-                vault::record_fmt(vault::RecordPrint::RECORD(record));
-                found = true;
-                break;
+                found.push(record);
+                continue;
             }
         }
     }
 
-    if !found {
+    if found.is_empty() {
         println!("[!] Record with '{}' doesn't exists", search);
         return;
     }
 
+    vault::record_fmt(vault::RecordPrint::VECTOR(found));
     log!(INFO, "Records were viewed");
 }
 
@@ -208,7 +213,7 @@ fn store_new_credential(entry: String) {
     print!("[+] Enter username for '{}': ", entry);
     data.push(vault::fgets());
 
-    print!("[+] Enter password for '{}' (on empty creates a safe password of length 30) : ", entry);
+    print!("[+] Enter password for '{}' (default length 30) : ", entry);
     let mut pass: String = vault::fgets();
     if pass.is_empty() {
         pass = vault::generate_rand_password(30);
@@ -237,7 +242,7 @@ fn update_existing_credential(search: String) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] No records were found!\nTry 'rustsafe add' to create a new record");
+                println!("[!] No records were found!\nTry 'rustsafe --add' to create a new record");
                 return;
             }
         },
@@ -253,7 +258,7 @@ fn update_existing_credential(search: String) {
     let mut req_record: Option<(usize, &vault::Record)> = None;
 
     for (idx, record) in records.iter().enumerate() {
-        if record.username().contains(&search) || (*record).entry().contains(&search) {
+        if record.username().contains(&search) || record.entry().contains(&search) {
             req_record = Some((idx, record));
             break;
         }
@@ -343,7 +348,7 @@ fn update_master_password() {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] No records were found!\nTry 'rustsafe add' to create a new record");
+                println!("[!] No records were found!\nTry 'rustsafe --add' to create a new record");
                 return;
             }
         },
@@ -397,7 +402,7 @@ fn remove_existing_credential(search: String) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] No records were found!\nTry 'rustsafe add' to create a new record");
+                println!("[!] No records were found!\nTry 'rustsafe --add' to create a new record");
                 return;
             }
         },
@@ -478,13 +483,13 @@ fn import_credentials_from_json(path: String) {
         }
     };
 
-    let foreign_passwd = rpassword::prompt_password("[+] Enter the password of the foreign json file: ").unwrap();
+    let foreign_passwd = rpassword::prompt_password(&format!("[+] Enter the password to {} file: ", path)).unwrap();
 
     let foreign_records: Vec<vault::Record> = match vault::load(&path, &foreign_passwd) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] 0 records were found in the foreign database!\nTry 'rustsafe add' to create a new record");
+                println!("[!] 0 records were found in the foreign database!\nTry 'rustsafe --add' to create a new record");
                 return;
             }
         },
@@ -513,7 +518,7 @@ fn export_credentials_to_json() {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[!] No records were found to export!\nTry 'rustsafe add' to create a new record");
+                println!("[!] No records were found to export!\nTry 'rustsafe --add' to create a new record");
                 return;
             }
         },
