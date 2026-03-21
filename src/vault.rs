@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 use std::{
-    fs, io::{self, Write},
+    fs, io::{self, Write}, collections::HashMap
 };
 use hex::{encode, decode};
 use hmac::{Mac, Hmac};
@@ -36,6 +36,12 @@ struct TabledData {
     password: String,
     email: String,
     note: String,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+struct DumpFile {
+    default: String,
+    profiles: HashMap<String, Vec<Record>>
 }
 
 pub enum RecordPrint {
@@ -228,20 +234,21 @@ pub fn record_fmt(data: RecordPrint) {
     println!("{}", tabled_data);
 }
 
-pub fn load(path: &str, key: &str) -> Result<Option<Vec<Record>>, String> {
-    // TODO: send the result too to log and give ban
-    let data: String = match fs::read_to_string(path) {
-        Ok(x) => x,
-        Err(x) => panic!("[!] Error {x}"),
-    };
+pub fn load<Err>(path: &str, key: &str, profile: Option<String>) -> Result<Option<Vec<Record>>, Err>
+where
+    Err: From<io::Error> + From<String> + From<serde_json::Error>
+{
+    let data = fs::read_to_string(path)?;
 
     if data.len() == 0 {
         return Ok(None);
     }
 
-    let records: Vec<Record> = match serde_json::from_str(&data) {
-        Ok(x) => x,
-        Err(x) => panic!("[!] Error {x}"),
+    let dump_file: DumpFile = serde_json::from_str(&data)?;
+
+    let records = match profile {
+        Some(profile_name) => dump_file.profiles.get(&profile_name).cloned().unwrap(),
+        None => dump_file.profiles.get(&dump_file.default).cloned().unwrap()
     };
 
     /* Decrypt the records */
@@ -253,10 +260,7 @@ pub fn load(path: &str, key: &str) -> Result<Option<Vec<Record>>, String> {
         new_key.push_str(&record.salt[..12]);
         new_key.push_str(key);
         new_key.push_str(&record.salt[12..]);
-        let decrypted_data = match record.decrypt_record(&hash256(&new_key)) {
-            Ok(x) => x,
-            Err(x) => return Err(x),
-        };
+        let decrypted_data = record.decrypt_record(&hash256(&new_key))?;
         decrypted_records.push(decrypted_data);
         new_key.clear();
     }
@@ -264,7 +268,10 @@ pub fn load(path: &str, key: &str) -> Result<Option<Vec<Record>>, String> {
     Ok(Some(decrypted_records))
 }
 
-pub fn dump(records: &[Record], path: &str, key: &str) {
+pub fn dump<Err>(records: &[Record], path: &str, key: &str, profile: Option<String>) -> Result<(), Err>
+where
+    Err: From<io::Error> + From<String> + From<serde_json::Error>
+{
     let mut encrypted_records: Vec<Record> = Vec::new();
     let mut new_key: String = String::new();
 
@@ -277,15 +284,20 @@ pub fn dump(records: &[Record], path: &str, key: &str) {
         new_key.clear();
     }
 
-    let encoded = match serde_json::to_string_pretty(&encrypted_records) {
-        Ok(x) => x,
-        Err(x) => panic!("[!] Error {x}"),
+    let data = fs::read_to_string(path)?;
+    let mut dump_file: DumpFile = serde_json::from_str(&data)?;
+
+    let profile = match profile {
+        Some(x) => x,
+        None => dump_file.default.clone()
     };
 
-    match fs::write(path, encoded.as_bytes()) {
-        Ok(()) => {},
-        Err(x) => panic!("[!] Error {x}"),
-    }
+    dump_file.profiles.insert(profile, encrypted_records);
+
+    let encoded = serde_json::to_string_pretty(&dump_file)?;
+    fs::write(path, encoded.as_bytes())?;
+
+    Ok(())
 }
 
 pub fn generate_rand_password(size: usize) -> String {
