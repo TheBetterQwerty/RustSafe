@@ -5,7 +5,7 @@ use std::env::Args;
 
 #[derive(Debug)]
 pub enum Commands {
-    Init,
+    Init(String),
     Logs,
     Add(String),            // Add new entry
     Get(String),            // Get record based on username or email
@@ -22,7 +22,7 @@ pub enum Commands {
     /* Profile Manipulation */
     Default(String),
     CreateProfile(String),
-    EditProfile(String),
+    EditProfile((String, String)),
     DeleteProfile(String),
     ListProfiles
 }
@@ -55,7 +55,9 @@ pub fn parse_args(mut args: Args) -> Option<(Option<String>,Commands)> {
 
             "--edit-profile" => {
                 if let Some(profile_name) = args.next() {
-                    command = Some(Commands::EditProfile(profile_name));
+                    if let Some(new_profile_name) = args.next() {
+                        command = Some(Commands::EditProfile((profile_name, new_profile_name)));
+                    }
                     break;
                 }
                 missing_cmd(cmd);
@@ -85,8 +87,11 @@ pub fn parse_args(mut args: Args) -> Option<(Option<String>,Commands)> {
             },
 
             "--init" => {
-                command = Some(Commands::Init);
-                break;
+                if let Some(profile) = args.next() {
+                    command = Some(Commands::Init(profile));
+                    break;
+                }
+                missing_cmd(cmd);
             },
 
             "--add" => {
@@ -196,7 +201,7 @@ fn helper(prog_name: String, command: Commands) {
 
         println!("\nCommands:");
         println!("  --version                     Displays current version");
-        println!("  --init                        Initiates the database");
+        println!("  --init <profile>              Initiates the database");
         println!("  --logs                        Prints the saved logs");
         println!("  --add <name>                  Add a new password entry");
         println!("  --get <name>                  Retrieve a password");

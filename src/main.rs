@@ -1,10 +1,11 @@
 /* Imports */
 use std::{
-    fs::{self, OpenOptions},
-    io::{Result, Read}, env
+    collections::HashMap, env, fs::{self, OpenOptions}, io::Read
 };
 use std::sync::OnceLock;
 use rpassword;
+
+use crate::vault::{DumpFile, fgets};
 
 /* Modules */
 mod vault;
@@ -19,11 +20,6 @@ static LOG_FILE: OnceLock<String> = OnceLock::new();
 
 type Commands = argparse::Commands;
 
-struct DataDump {
-    default: String,
-    profiles: Vec<&'static[vault::Record]>
-}
-
 fn main() {
     if let None = set_paths() {
         println!("[!] Error: In setting paths!");
@@ -36,7 +32,7 @@ fn main() {
     };
 
     match command {
-        Commands::Init => {
+        Commands::Init(profile) => {
             if fs::exists(PATH.get().unwrap()).unwrap() {
                 let val = format!("[+] DataBase Already Exists!");
                 println!("{}", val);
@@ -44,7 +40,7 @@ fn main() {
                 return;
             }
 
-            match initialize_database() {
+            match initialize_database(profile) {
                 Ok(()) => println!("[+] Database created successfully"),
                 Err(x) => {
                     println!("[!] Error: {x}");
@@ -56,7 +52,7 @@ fn main() {
         Commands::Logs => print_logs(),
 
         Commands::Generate(size) => {
-            let data: String = format!("Generated Password -> {}", vault::generate_rand_password(size));
+            let data: String = format!("[$] Generated Password -> {}", vault::generate_rand_password(size));
             println!("{}", data);
             log!(INFO, data);
         },
@@ -78,33 +74,135 @@ fn main() {
             }
 
             match command {
-                Commands::Add(entry) => store_new_credential(entry),
-                Commands::Get(entry) => display_stored_credentials(Some(entry)),
-                Commands::List => display_stored_credentials(None),
-                Commands::Edit(entry) => update_existing_credential(entry),
-                Commands::Delete(entry) => remove_existing_credential(entry),
-                Commands::Passwd => update_master_password(),
-                Commands::Import(path) => import_credentials_from_json(path),
-                Commands::Export => export_credentials_to_json(),
+                Commands::Add(entry) => store_new_credential(entry, profile.as_ref()),
+                Commands::Get(entry) => display_stored_credentials(Some(entry), profile.as_ref()),
+                Commands::List => display_stored_credentials(None, profile.as_ref()),
+                Commands::Edit(entry) => update_existing_credential(entry, profile.as_ref()),
+                Commands::Delete(entry) => remove_existing_credential(entry, profile.as_ref()),
+                Commands::Passwd => update_master_password(profile.as_ref()),
+                Commands::Import(path) => import_credentials_from_json(path, profile.as_ref()),
+                Commands::Export => export_credentials_to_json(profile.as_ref()),
 
                 /* Profile Setup */
                 Commands::Default(profile) => set_default_profile(profile),
-                Commands::CreateProfile(profile) => {},
-                Commands::EditProfile(profile) => {},
-                Commands::DeleteProfile(profile) => {},
+                Commands::CreateProfile(profile) => create_profile(profile),
+                Commands::EditProfile((profile, new_profile_name)) => edit_profile_name(profile, new_profile_name),
+                Commands::DeleteProfile(profile) => delete_profile(profile),
                 _ => {},
             }
         }
     }
 }
 
-fn set_default_profile(profile: String) {}
+fn set_default_profile(profile: String) {
+    let path = PASSWORDFILE.get().unwrap();
+    let mut dump = match DumpFile::load_dumpfile(&path) {
+        Ok(x) => x,
+        Err(err) => {
+            eprintln!("Error: {err}");
+            return;
+        }
+    };
 
-fn create_profile(profile: String) {}
+    dump.default = Some(profile);
 
-fn edit_profile_name(profile: String) {}
+    if let Err(err) = dump.dump_dumpfile(&path) {
+        eprintln!("[!] Error: {err}");
+    }
 
-fn delete_profile(profile: String) {}
+    log!(INFO, "Default profile was changed");
+}
+
+fn create_profile(profile: String) {
+    let path = PASSWORDFILE.get().unwrap();
+    let mut dump = match DumpFile::load_dumpfile(&path) {
+        Ok(x) => x,
+        Err(err) => {
+            eprintln!("Error: {err}");
+            return;
+        }
+    };
+
+    if dump.profiles.get(&profile).is_none() {
+        dump.profiles.insert(profile, Vec::new());
+    } else {
+        eprintln!("[!] Error: Profile '{}' already exists!", profile);
+        return;
+    }
+
+    if let Err(err) = dump.dump_dumpfile(&path) {
+        eprintln!("[!] Error: {err}");
+    }
+
+    log!(INFO, "A new profile was created");
+}
+
+fn edit_profile_name(old_profile: String, profile: String) {
+    let path = PASSWORDFILE.get().unwrap();
+    let mut dump = match DumpFile::load_dumpfile(&path) {
+        Ok(x) => x,
+        Err(err) => {
+            eprintln!("Error: {err}");
+            return;
+        }
+    };
+
+    if let Some(value) = dump.profiles.get(&old_profile) {
+        let new_value = value.clone();
+        dump.profiles.remove(&old_profile);
+
+        dump.profiles.insert(profile, new_value);
+    } else {
+        eprintln!("[!] Error: No profile '{}' exists with that name", old_profile);
+        return;
+    }
+
+    if let Some(ref default_profile) = dump.default {
+        if default_profile.eq(&old_profile) {
+            dump.default = None;
+        }
+    }
+
+    if let Err(err) = dump.dump_dumpfile(&path) {
+        eprintln!("[!] Error: {err}");
+    }
+
+    log!(INFO, "A profile was edited");
+}
+
+fn delete_profile(profile: String) {
+    let path = PASSWORDFILE.get().unwrap();
+    let mut dump = match DumpFile::load_dumpfile(&path) {
+        Ok(x) => x,
+        Err(err) => {
+            eprintln!("Error: {err}");
+            return;
+        }
+    };
+
+    if dump.profiles.get(&profile).is_some() {
+        print!("[+] Profile '{}' found. Do you want to delete it ? (Y/N)", profile);
+        if 'n' == fgets().chars().nth(0).unwrap().to_ascii_lowercase() {
+            println!("[$] Profile '{}' wasn't deleted!", profile);
+            return;
+        }
+
+        dump.profiles.remove(&profile);
+        println!("[$] Profile '{}' was deleted!", profile);
+    }
+
+    if let Some(ref def_profile) = dump.default {
+        if def_profile.eq(&profile) {
+            dump.default = None;
+        }
+    }
+
+    if let Err(err) = dump.dump_dumpfile(&path) {
+        eprintln!("[!] Error: {err}");
+    }
+
+    log!(INFO, "A profile was deleted");
+}
 
 fn set_paths() -> Option<()> {
     let dir_name = env::home_dir()?;
@@ -138,17 +236,24 @@ fn print_logs() {
     log!(INFO, "Logs were viewed");
 }
 
-fn initialize_database() -> Result<()> {
-    fs::create_dir(PATH.get().unwrap())?;
-    let _ = fs::File::create(PASSWORDFILE.get().unwrap())?;
-
-
+fn initialize_database(profile: String) -> std::result::Result<(), String> {
+    fs::create_dir(PATH.get().unwrap()).map_err(|e| e.to_string())?;
+    let path = PASSWORDFILE.get().unwrap();
+    let _ = fs::File::create(path).map_err(|e| e.to_string())?;
     let _ = log!(LOG_FILE.get().unwrap());
+
+    let mut profiles = HashMap::new();
+    profiles.insert(profile.clone(), Vec::new());
+
+    let file = DumpFile { default: Some(profile), profiles: profiles };
+
+    file.dump_dumpfile(path).map_err(|e| e.to_string())?;
+
     log!(INFO, "DataBase Created");
     Ok(())
 }
 
-fn display_stored_credentials(entry: Option<String>, profile: Option<String>) {
+fn display_stored_credentials(entry: Option<String>, profile: Option<&String>) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
     let records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password, profile) {
@@ -214,7 +319,7 @@ fn display_stored_credentials(entry: Option<String>, profile: Option<String>) {
     log!(INFO, "Records were viewed");
 }
 
-fn store_new_credential(entry: String, profile: Option<String>) {
+fn store_new_credential(entry: String, profile: Option<&String>) {
     let mut data: Vec<String> = vec![entry.clone()];
 
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
@@ -254,13 +359,16 @@ fn store_new_credential(entry: String, profile: Option<String>) {
 
     records.push(vault::Record::new(&data, &password));
 
-    vault::dump(&records, PASSWORDFILE.get().unwrap(), &password);
+    if let Err(err) = vault::dump(&records, PASSWORDFILE.get().unwrap(), &password, profile) {
+        eprintln!("[!] Error: {err}");
+        return;
+    }
 
     println!("[+] Credentials was stored into the database!");
     log!(INFO, "New record was added to the database");
 }
 
-fn update_existing_credential(search: String, profile: Option<String>) {
+fn update_existing_credential(search: String, profile: Option<&String>) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
     let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password, profile) {
@@ -362,13 +470,16 @@ fn update_existing_credential(search: String, profile: Option<String>) {
 
         println!("[+] Credentials was updated sucessfully");
 
-        vault::dump(&records, PASSWORDFILE.get().unwrap(), &password);
+        if let Err(err) = vault::dump(&records, PASSWORDFILE.get().unwrap(), &password, profile) {
+            eprintln!("[!] Error: {err}");
+            return;
+        }
 
         log!(INFO, format!("Credentials was updated with the phrase '{}'", search));
     }
 }
 
-fn update_master_password(profile: Option<String>) {
+fn update_master_password(profile: Option<&String>) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
     let records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password, profile) {
@@ -383,6 +494,8 @@ fn update_master_password(profile: Option<String>) {
             if err.contains("[!] Error decrypting message") {
                 println!("[!] Incorrect Password");
                 log!(INVALID, "Incorrect Password");
+            } else {
+                println!("[!] Error: {err}");
             }
             return;
         }
@@ -416,13 +529,15 @@ fn update_master_password(profile: Option<String>) {
         new_records.push(vault::Record::new(&data, &_password));
     }
 
-    vault::dump(&new_records, PASSWORDFILE.get().unwrap(), &_password);
+    if let Err(err) = vault::dump(&new_records, PASSWORDFILE.get().unwrap(), &_password, profile) {
+        eprintln!("[!] Error: {err}");
+    }
 
     println!("[+] Master password was changed successfully!");
     log!(INFO, "Master password was changed");
 }
 
-fn remove_existing_credential(search: String, profile: Option<String>) {
+fn remove_existing_credential(search: String, profile: Option<&String>) {
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
     let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password, profile) {
@@ -437,6 +552,8 @@ fn remove_existing_credential(search: String, profile: Option<String>) {
             if err.contains("[!] Error decrypting message") {
                 println!("[!] Incorrect Password");
                 log!(INVALID, "Incorrect Password");
+            } else {
+                println!("[!] Error: {err}");
             }
             return;
         }
@@ -487,10 +604,13 @@ fn remove_existing_credential(search: String, profile: Option<String>) {
         println!("[#] Record Wasnt Deleted!");
     }
 
-    vault::dump(&records, PASSWORDFILE.get().unwrap(), &password);
+    if let Err(err) = vault::dump(&records, PASSWORDFILE.get().unwrap(), &password, profile) {
+        eprintln!("[!] Error: {err}");
+        return;
+    }
 }
 
-fn import_credentials_from_json(path: String, profile: Option<String>) {
+fn import_credentials_from_json(path: String, profile: Option<&String>) {
     // Perfect it
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
@@ -506,6 +626,8 @@ fn import_credentials_from_json(path: String, profile: Option<String>) {
             if err.contains("[!] Error decrypting message") {
                 println!("[!] Incorrect Password");
                 log!(INVALID, "Incorrect Password");
+            } else {
+                println!("[!] Error: {err}");
             }
             return;
         }
@@ -524,6 +646,8 @@ fn import_credentials_from_json(path: String, profile: Option<String>) {
         Err(err) => {
             if err.contains("[!] Error decrypting message") {
                 println!("[!] Incorrect Password"); // no need to ban for foreign records
+            } else {
+                println!("[!] Error: {err}");
             }
             return;
         }
@@ -533,17 +657,21 @@ fn import_credentials_from_json(path: String, profile: Option<String>) {
         records.push(record);
     }
 
-    vault::dump(&records, PASSWORDFILE.get().unwrap(), &password);
+    if let Err(err) = vault::dump(&records, PASSWORDFILE.get().unwrap(), &password, profile) {
+        eprintln!("[!] Error: {err}");
+        return;
+    }
+
     println!("[+] Passwords were imported successfully from {}", path);
 
     log!(INFO, format!("Passwords were imported successfully from {}", path));
 }
 
-fn export_credentials_to_json() {
+fn export_credentials_to_json(profile: Option<&String>) {
     // The whole file
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
-    let records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password) {
+    let records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password, profile) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
@@ -560,7 +688,11 @@ fn export_credentials_to_json() {
         }
     };
 
-    vault::dump(&records, EXPORTFILE.get().unwrap(), &password);
+    if let Err(err) = vault::dump(&records, EXPORTFILE.get().unwrap(), &password, profile) {
+        eprintln!("[!] Error: {err}");
+        return;
+    }
+
     println!("[+] Record was exported to '{}'", EXPORTFILE.get().unwrap());
 
     log!(INFO, format!("Record was exported to '{}'", EXPORTFILE.get().unwrap()));
