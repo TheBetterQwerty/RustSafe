@@ -163,6 +163,12 @@ pub fn parse_args(mut args: Args) -> Option<(Option<String>,Commands)> {
                 continue;
             },
 
+            "--version" | "-v" => {
+                show_version();
+                return None;
+            },
+
+
             _ => {}
         }
     }
