@@ -1,7 +1,8 @@
 use std::{
-    sync::Mutex, fs::File,
-    time::{SystemTime, UNIX_EPOCH},
-    io::{Read, Write}
+    fs::File,
+    io::{Read, Write},
+    sync::OnceLock,
+    time::{SystemTime, UNIX_EPOCH}
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -13,7 +14,7 @@ pub enum LogType {
     INFO
 }
 
-pub static LOG_FILE: Mutex<Option<File>> = Mutex::new(None);
+pub static RW_LOG_FILE: OnceLock<File> = OnceLock::new();
 pub const BAN_TIME: u128 = 5 * 60 * 1000;
 const MAX_FAILS: usize = 5;
 const MAX_LOGS: usize = 500;
@@ -30,8 +31,12 @@ macro_rules! log {
                 .create(true)   // create if not exists
                 .open($debug);
 
-            let mut logger = crate::logger::LOG_FILE.lock().unwrap();
-            *logger = Some(file.unwrap());
+            /*let mut logger = crate::logger::RW_LOG_FILE.lock().unwrap();
+            *logger = Some(file.unwrap()); */
+            if crate::logger::RW_LOG_FILE.get().is_none() {
+                let owned_file = file.unwrap();
+                let _ = crate::logger::RW_LOG_FILE.set(owned_file);
+            }
         }
 
         let last_logs = match crate::logger::get_last_logs(5usize, $debug) {
@@ -52,8 +57,16 @@ macro_rules! log {
         };
         let log_type = $crate::logger::LogType::$type;
 
-        if let Some(ref mut file) = *crate::logger::LOG_FILE.lock().unwrap() {
-            let _ = writeln!(file, "{} {:?} {}", time, log_type, $debug);
+        /*if let Some(ref mut file) = *crate::logger::RW_LOG_FILE.lock().unwrap() {
+            let x = writeln!(file, "{} {:?} {}", time, log_type, $debug);
+            dbg!(x);
+        } */
+
+        match crate::logger::RW_LOG_FILE.get() {
+            Some(ref mut file) => {
+                let _ = writeln!(file, "{} {:?} {}", time, log_type, $debug);
+            },
+            None => {},
         }
     }};
 }
@@ -64,7 +77,7 @@ fn give_ban() {
         Err(_) => panic!("[!] Error: SytemTime Before UNIX_EPOCH"),
     };
 
-    if let Some(ref mut file) = *LOG_FILE.lock().unwrap() {
+    if let Some(ref mut file) = RW_LOG_FILE.get() {
         let _ = writeln!(file, "{} BAN User Banned for {} milliseconds", time, BAN_TIME);
     }
 
@@ -97,7 +110,7 @@ pub fn ban_if_invalid(logs: Vec<LogType>) -> bool {
 
 pub fn get_last_logs(n: usize, file: &str) -> Option<Vec<LogType>> {
     let mut buffer = String::new();
-    if let Some(ref mut file) = *LOG_FILE.lock().unwrap() {
+    if let Some(ref mut file) = RW_LOG_FILE.get() {
         file.read_to_string(&mut buffer).unwrap();
     }
 

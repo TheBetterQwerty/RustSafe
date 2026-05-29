@@ -4,6 +4,7 @@ use std::{
 };
 use std::sync::OnceLock;
 use rpassword;
+use tabled::{Table, Tabled, settings::Style};
 
 use crate::vault::{DumpFile, fgets};
 
@@ -21,7 +22,7 @@ static LOG_FILE: OnceLock<String> = OnceLock::new();
 type Commands = argparse::Commands;
 
 fn main() {
-    if let None = set_paths() {
+    if set_paths().is_none() {
         println!("[!] Error: In setting paths!");
         return;
     }
@@ -54,7 +55,8 @@ fn main() {
         Commands::Generate(size) => {
             let data: String = format!("[$] Generated Password -> {}", vault::generate_rand_password(size));
             println!("{}", data);
-            log!(INFO, data);
+            log!(LOG_FILE.get().unwrap());
+            log!(DEBUG, data);
         },
 
         _ => {
@@ -88,6 +90,7 @@ fn main() {
                 Commands::CreateProfile(profile) => create_profile(profile),
                 Commands::EditProfile((profile, new_profile_name)) => edit_profile_name(profile, new_profile_name),
                 Commands::DeleteProfile(profile) => delete_profile(profile),
+                Commands::ListProfiles => list_profiles(),
                 _ => {},
             }
         }
@@ -170,6 +173,39 @@ fn edit_profile_name(old_profile: String, profile: String) {
     log!(INFO, "A profile was edited");
 }
 
+#[allow(non_snake_case)]
+#[derive(Tabled)]
+struct Profiles {
+    S_no: usize,
+    Profile: String
+}
+
+fn list_profiles() {
+    let path = PASSWORDFILE.get().unwrap();
+    let profiles = match DumpFile::load_dumpfile(&path) {
+        Ok(x) => x.profiles,
+        Err(err) => {
+            eprintln!("Error: {err}");
+            return;
+        }
+    };
+
+    let profiles: Vec<Profiles> = profiles
+        .into_keys()
+        .enumerate()
+        .map(|(x, y)|
+            Profiles {
+                S_no: x + 1,
+                Profile: y
+            }
+        ).collect();
+
+    let mut table = Table::new(profiles);
+    table.with(Style::rounded());
+
+    println!("{table}");
+}
+
 fn delete_profile(profile: String) {
     let path = PASSWORDFILE.get().unwrap();
     let mut dump = match DumpFile::load_dumpfile(&path) {
@@ -240,7 +276,7 @@ fn initialize_database(profile: String) -> std::result::Result<(), String> {
     fs::create_dir(PATH.get().unwrap()).map_err(|e| e.to_string())?;
     let path = PASSWORDFILE.get().unwrap();
     let _ = fs::File::create(path).map_err(|e| e.to_string())?;
-    let _ = log!(LOG_FILE.get().unwrap());
+    log!(LOG_FILE.get().unwrap());
 
     let mut profiles = HashMap::new();
     profiles.insert(profile.clone(), Vec::new());
@@ -275,7 +311,7 @@ fn display_stored_credentials(entry: Option<String>, profile: Option<&String>) {
         }
     };
 
-    if let None = entry {        // if list is called
+    if entry.is_none() {        // if list is called
         if records.is_empty() {
             println!("[!] No passwords were saved!\nTry 'rustsafe --add' to create a new record");
             log!(INFO, "All Records were viewed but database empty");
@@ -290,20 +326,20 @@ fn display_stored_credentials(entry: Option<String>, profile: Option<&String>) {
     let mut found = Vec::new();
 
     for record in records {
-        if record.entry().contains(&search) || record.username().contains(&search) {
+        if record.entry().to_lowercase().contains(&search) || record.username().to_lowercase().contains(&search) {
             found.push(record);
             continue;
         }
 
         if let Some(_email) = record.email() {
-            if _email.contains(&search) {
+            if _email.to_lowercase().contains(&search) {
                 found.push(record);
                 continue;
             }
         }
 
         if let Some(note) = record.note() {
-            if note.contains(&search) {
+            if note.to_lowercase().contains(&search) {
                 found.push(record);
                 continue;
             }
@@ -393,20 +429,20 @@ fn update_existing_credential(search: String, profile: Option<&String>) {
     let mut req_record: Option<(usize, &vault::Record)> = None;
 
     for (idx, record) in records.iter().enumerate() {
-        if record.username().contains(&search) || record.entry().contains(&search) {
+        if record.username().to_lowercase().contains(&search) || record.entry().to_lowercase().contains(&search) {
             req_record = Some((idx, record));
             break;
         }
 
         if let Some(_email) = record.email() {
-            if _email.contains(&search) {
+            if _email.to_lowercase().contains(&search) {
                 req_record = Some((idx, record));
                 break;
             }
         }
 
         if let Some(_note) = record.note() {
-            if _note.contains(&search) {
+            if _note.to_lowercase().contains(&search) {
                 req_record = Some((idx, record));
                 break;
             }
@@ -562,20 +598,20 @@ fn remove_existing_credential(search: String, profile: Option<&String>) {
     let mut req_records: Vec<(usize, &vault::Record)> = Vec::new();
 
     for (idx, record) in records.iter().enumerate() {
-        if record.username().contains(&search) || (*record).entry().contains(&search) {
+        if record.username().to_lowercase().contains(&search) || (*record).entry().to_lowercase().contains(&search) {
             req_records.push((idx, record));
             continue;
         }
 
         if let Some(_email) = record.email() {
-            if _email.contains(&search) {
+            if _email.to_lowercase().contains(&search) {
                 req_records.push((idx, record));
                 continue;
             }
         }
 
         if let Some(_note) = record.note() {
-            if _note.contains(&search) {
+            if _note.to_lowercase().contains(&search) {
                 req_records.push((idx, record));
                 continue;
             }
