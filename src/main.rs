@@ -1,3 +1,8 @@
+/* Modules */
+mod vault;
+mod logger;
+mod argparse;
+
 /* Imports */
 use std::{
     collections::HashMap, env, fs::{self, OpenOptions}, io::Read
@@ -7,11 +12,6 @@ use rpassword;
 use tabled::{Table, Tabled, settings::Style};
 
 use crate::vault::{DumpFile, fgets};
-
-/* Modules */
-mod vault;
-mod logger;
-mod argparse;
 
 /* Constants */
 static PATH: OnceLock<String> = OnceLock::new();
@@ -724,9 +724,20 @@ fn export_credentials_to_json(profile: Option<&String>) {
         }
     };
 
-    if let Err(err) = vault::dump(&records, EXPORTFILE.get().unwrap(), &password, profile) {
-        eprintln!("[!] Error: {err}");
-        return;
+    let mut data = String::from("Entry,Username,Password,Email,Note\n");
+    for record in records {
+        data.push_str(&format!(
+                "{},{},{},{},{}\n",
+                record.entry(),
+                record.username(),
+                record.password(),
+                record.email().unwrap_or_else(|| String::from("NULL")),
+                record.note().unwrap_or_else(|| String::from("NULL"))
+        ));
+    }
+
+    if let Err(_) = std::fs::write(EXPORTFILE.get().unwrap(), data) {
+        eprintln!("[!] Error: Writting data to export file!");
     }
 
     println!("[+] Record was exported to '{}'", EXPORTFILE.get().unwrap());

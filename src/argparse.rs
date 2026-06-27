@@ -1,9 +1,7 @@
-#![allow(unused_assignments)]
-#![allow(unused)]
-
 use std::env::Args;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum Commands {
     Init(String),
     Logs,

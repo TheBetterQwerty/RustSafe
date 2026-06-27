@@ -31,8 +31,6 @@ macro_rules! log {
                 .create(true)   // create if not exists
                 .open($debug);
 
-            /*let mut logger = crate::logger::RW_LOG_FILE.lock().unwrap();
-            *logger = Some(file.unwrap()); */
             if crate::logger::RW_LOG_FILE.get().is_none() {
                 let owned_file = file.unwrap();
                 let _ = crate::logger::RW_LOG_FILE.set(owned_file);
@@ -56,11 +54,6 @@ macro_rules! log {
             Err(_) => panic!("[!] Error: SytemTime Before UNIX_EPOCH"),
         };
         let log_type = $crate::logger::LogType::$type;
-
-        /*if let Some(ref mut file) = *crate::logger::RW_LOG_FILE.lock().unwrap() {
-            let x = writeln!(file, "{} {:?} {}", time, log_type, $debug);
-            dbg!(x);
-        } */
 
         match crate::logger::RW_LOG_FILE.get() {
             Some(ref mut file) => {
