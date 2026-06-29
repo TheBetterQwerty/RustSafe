@@ -224,6 +224,7 @@ impl DumpFile {
         let encoded = serde_json::to_string_pretty(self).map_err(|e| format!("{e}"))?;
         fs::write(path, encoded.as_bytes()).map_err(|e| format!("{e}"))
     }
+
 }
 
 impl TabledData {

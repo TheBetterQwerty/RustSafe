@@ -8,6 +8,7 @@ use std::{
     collections::HashMap, env, fs::{self, OpenOptions}, io::Read
 };
 use std::sync::OnceLock;
+use csv::Writer;
 use rpassword;
 use tabled::{Table, Tabled, settings::Style};
 
@@ -83,7 +84,7 @@ fn main() {
                 Commands::Delete(entry) => remove_existing_credential(entry, profile.as_ref()),
                 Commands::Passwd => update_master_password(profile.as_ref()),
                 Commands::Import(path) => import_credentials_from_json(path, profile.as_ref()),
-                Commands::Export => export_credentials_to_json(profile.as_ref()),
+                Commands::Export => export_credentials_to_json(),
 
                 /* Profile Setup */
                 Commands::Default(profile) => set_default_profile(profile),
@@ -180,6 +181,20 @@ struct Profiles {
     Profile: String
 }
 
+impl Profiles {
+    fn get_profiles(raw_data: HashMap<String, Vec<vault::Record>>) -> Vec<Profiles> {
+        raw_data
+            .into_keys()
+            .enumerate()
+            .map(|(idx, data)|
+                Profiles {
+                    S_no: idx + 1,
+                    Profile: data
+                }
+            ).collect()
+    }
+}
+
 fn list_profiles() {
     let path = PASSWORDFILE.get().unwrap();
     let profiles = match DumpFile::load_dumpfile(&path) {
@@ -190,15 +205,7 @@ fn list_profiles() {
         }
     };
 
-    let profiles: Vec<Profiles> = profiles
-        .into_keys()
-        .enumerate()
-        .map(|(x, y)|
-            Profiles {
-                S_no: x + 1,
-                Profile: y
-            }
-        ).collect();
+    let profiles = Profiles::get_profiles(profiles);
 
     let mut table = Table::new(profiles);
     table.with(Style::rounded());
@@ -647,7 +654,7 @@ fn remove_existing_credential(search: String, profile: Option<&String>) {
 }
 
 fn import_credentials_from_json(path: String, profile: Option<&String>) {
-    // Perfect it
+    // Add support of csv files
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
     let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password, profile) {
@@ -703,44 +710,57 @@ fn import_credentials_from_json(path: String, profile: Option<&String>) {
     log!(INFO, format!("Passwords were imported successfully from {}", path));
 }
 
-fn export_credentials_to_json(profile: Option<&String>) {
-    // The whole file
-    let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
+fn export_credentials_to_json() {
+    let path = PASSWORDFILE.get().unwrap();
 
-    let records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password, profile) {
-        Ok(y) => match y {
-            Some(x) => x,
-            None => {
-                println!("[!] No records were found to export!\nTry 'rustsafe --add' to create a new record");
-                return;
-            }
-        },
+    let profiles = match DumpFile::load_dumpfile(&path) {
+        Ok(x) => x.profiles,
         Err(err) => {
-            if err.contains("[!] Error decrypting message") {
-                println!("[!] Incorrect Password");
-                log!(INVALID, "Incorrect Password");
-            }
+            eprintln!("Error: {err}");
             return;
         }
     };
 
-    let mut data = String::from("Entry,Username,Password,Email,Note\n");
-    for record in records {
-        data.push_str(&format!(
-                "{},{},{},{},{}\n",
+    for (profile_name, _) in &profiles {
+        let password: String = rpassword::prompt_password(
+            format!("[+] Enter master password for `{}` profile: ", profile_name)
+        ).unwrap();
+
+        let records = match vault::load(path, &password, Some(profile_name)) {
+            Ok(y) => match y {
+                Some(x) => x,
+                None => {
+                    println!("[!] No records were found to export!\nTry 'rustsafe --add' to create a new record");
+                    return;
+                }
+            },
+            Err(err) => {
+                if err.contains("[!] Error decrypting message") {
+                    println!("[!] Incorrect Password");
+                    log!(INVALID, "Incorrect Password");
+                }
+                return;
+            }
+        };
+
+        let export_file_name = format!("{}/exportfile_{}.csv", EXPORTFILE.get().unwrap(), profile_name);
+
+        let mut writer = Writer::from_path(&export_file_name).unwrap();
+        writer.write_record(&["Entry", "Username", "Password", "Email", "Note"]).unwrap();
+
+        for record in records {
+            writer.write_record(&[
                 record.entry(),
                 record.username(),
                 record.password(),
-                record.email().unwrap_or_else(|| String::from("NULL")),
-                record.note().unwrap_or_else(|| String::from("NULL"))
-        ));
-    }
+                record.email().unwrap_or_else(|| "".into()),
+                record.note().unwrap_or_else(|| "".into()),
+            ]).unwrap();
+        }
 
-    if let Err(_) = std::fs::write(EXPORTFILE.get().unwrap(), data) {
-        eprintln!("[!] Error: Writting data to export file!");
-    }
+        println!("[+] Record was exported to '{}'", export_file_name);
 
-    println!("[+] Record was exported to '{}'", EXPORTFILE.get().unwrap());
+    }
 
     log!(INFO, format!("Record was exported to '{}'", EXPORTFILE.get().unwrap()));
 }
