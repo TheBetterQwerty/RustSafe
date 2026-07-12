@@ -1,24 +1,31 @@
-# Rust-Safe [1.6.3]
+# Rust-Safe [1.8.2]
 
-**Rust-Safe** is a secure, lightweight, command-line password manager written in Rust. It is designed for simplicity, local control, and robust cryptographic practices. Passwords are encrypted and stored in a local JSON file, which can be safely exported or imported as needed.
+**Rust-Safe** is a secure, lightweight, command-line password manager written in Rust. It is designed for simplicity, local control, and robust cryptographic practices. Passwords are encrypted and stored in a local JSON file, which can be safely exported or imported as needed. It supports profiles with different master passwords as of current version.
 
 ---
 
 ## Features
 
-| Command             | Description                                |
-| ------------------- | ------------------------------------------ |
-| `--version`         | Current Version of RustSafe                |
-| `--init`            | Initiate's the database                    |
-| `--logs`            | Prints all saved logs                      |
-| `--add <name>`      | Add a new password entry                   |
-| `--get <name>`      | Retrieve a stored password                 |
-| `--list`            | List all saved entries                     |
-| `--rm <name>`       | Remove an entry                            |
-| `--generate <size>` | Generate a secure, random password         |
-| `--passwd`          | Change the master password                 |
-| `--import <path>`   | Import passwords from a JSON file          |
-| `--export`          | Export all passwords to a secure JSON file |
+| Command                          | Description                                   |
+| -------------------------------- | --------------------------------------------- |
+| `--version`                      | Display the current RustSafe version          |
+| `--init <profile>`               | Initialize the database                       |
+| `--logs`                         | Print all saved logs                          |
+| `--add <name>`                   | Add a new password entry                      |
+| `--get <name>`                   | Retrieve a stored password                    |
+| `--list`                         | List all saved entries                        |
+| `--edit <name>`                  | Edit an existing password entry               |
+| `--rm <name>`                    | Remove an entry                               |
+| `--generate <size>`              | Generate a secure random password             |
+| `--passwd`                       | Change the master password                    |
+| `--import <path>`                | Import passwords from a JSON file             |
+| `--export`                       | Export all passwords to a secure JSON file    |
+| `--create-profile <name>`        | Create a new profile                          |
+| `--edit-profile <name>`          | Rename or modify a profile                    |
+| `--delete-profile <name>`        | Delete a profile                              |
+| `--list-profiles`                | List all available profiles                   |
+| `--set-default-profile <name>`   | Set the default profile                       |
+| `--from <name>`                  | Execute a command using the specified profile |
 
 ---
 
