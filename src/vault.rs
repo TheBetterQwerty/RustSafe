@@ -260,8 +260,7 @@ pub fn record_fmt(data: RecordPrint) {
     println!("{}", tabled_data);
 }
 
-pub fn load(path: &str, key: &str, profile: Option<&String>) -> Result<Option<Vec<Record>>, String>
-{
+pub fn load(path: &str, key: &str, profile: Option<&String>) -> Result<Option<Vec<Record>>, String> {
     let dump_file = DumpFile::load_dumpfile(path)?;
 
     let records = match profile {

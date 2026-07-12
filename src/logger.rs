@@ -31,18 +31,18 @@ macro_rules! log {
                 .create(true)   // create if not exists
                 .open($debug);
 
-            if crate::logger::RW_LOG_FILE.get().is_none() {
+            if $crate::logger::RW_LOG_FILE.get().is_none() {
                 let owned_file = file.unwrap();
-                let _ = crate::logger::RW_LOG_FILE.set(owned_file);
+                let _ = $crate::logger::RW_LOG_FILE.set(owned_file);
             }
         }
 
-        let last_logs = match crate::logger::get_last_logs(5usize, $debug) {
+        let last_logs = match $crate::logger::get_last_logs(5usize, $debug) {
             Some(x) => x,
             None => Vec::new()
         };
 
-        crate::logger::ban_if_invalid(last_logs) // false if banned
+        $crate::logger::ban_if_invalid(last_logs) // false if banned
     }};
 
     ($type:ident, $debug:expr) => {{
@@ -55,7 +55,7 @@ macro_rules! log {
         };
         let log_type = $crate::logger::LogType::$type;
 
-        match crate::logger::RW_LOG_FILE.get() {
+        match $crate::logger::RW_LOG_FILE.get() {
             Some(ref mut file) => {
                 let _ = writeln!(file, "{} {:?} {}", time, log_type, $debug);
             },

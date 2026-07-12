@@ -5,11 +5,10 @@ mod argparse;
 
 /* Imports */
 use std::{
-    collections::HashMap, env, fs::{self, OpenOptions}, io::Read
+    collections::HashMap, env::{self}, fs::{self, OpenOptions}, io::Read
 };
 use std::sync::OnceLock;
-use csv::Writer;
-use rpassword;
+use csv::{Reader, Writer};
 use tabled::{Table, Tabled, settings::Style};
 
 use crate::vault::{DumpFile, fgets};
@@ -363,11 +362,12 @@ fn display_stored_credentials(entry: Option<String>, profile: Option<&String>) {
 }
 
 fn store_new_credential(entry: String, profile: Option<&String>) {
-    let mut data: Vec<String> = vec![entry.clone()];
+    let mut data: Vec<String> = Vec::new();
+    let path = PASSWORDFILE.get().unwrap();
 
     let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
 
-    let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password, profile) {
+    let mut records: Vec<vault::Record> = match vault::load(path, &password, profile) {
         Ok(y) => match y {
             Some(x) => x,
             None => Vec::new(),
@@ -400,9 +400,10 @@ fn store_new_credential(entry: String, profile: Option<&String>) {
     print!("[+] Enter note for '{}' (optional): ", entry);
     data.push(vault::fgets());
 
+    data.insert(0, entry);
     records.push(vault::Record::new(&data, &password));
 
-    if let Err(err) = vault::dump(&records, PASSWORDFILE.get().unwrap(), &password, profile) {
+    if let Err(err) = vault::dump(&records, path, &password, profile) {
         eprintln!("[!] Error: {err}");
         return;
     }
@@ -653,15 +654,71 @@ fn remove_existing_credential(search: String, profile: Option<&String>) {
     }
 }
 
+// Profile if --from is used
 fn import_credentials_from_json(path: String, profile: Option<&String>) {
-    // Add support of csv files
-    let password: String = rpassword::prompt_password("[+] Enter master password: ").unwrap();
+    let mut data = Vec::new();
 
-    let mut records: Vec<vault::Record> = match vault::load(PASSWORDFILE.get().unwrap(), &password, profile) {
+    {
+        let mut reader = Reader::from_path(&path).unwrap();
+
+        for read in reader.records() {
+            let read = read.unwrap();
+            data.push(read.iter().map(|f| f.to_string()).collect::<Vec<_>>());
+        }
+    }
+
+    let dump = DumpFile::load_dumpfile(PASSWORDFILE.get().unwrap()).unwrap();
+    let profile = match profile {
+        Some(x) => {
+            if dump.profiles.contains_key(x) {
+                print!("[#] This Profile is available do you want to append the creadentials to this profile ? (Y/n)");
+                let choice = match vault::fgets().to_lowercase().chars().nth(0) {
+                    Some(x) => x,
+                    None => {
+                        eprintln!("[!] Error: Please enter something!");
+                        return;
+                    }
+                };
+
+                if choice == 'y' { profile } else { None }
+            } else {
+                create_profile(x.to_string());
+                profile
+            }
+        },
+        None => {
+            // default profile
+            print!("[#] Import passwords into default profile ? (Y/n)");
+            let choice = match vault::fgets().to_lowercase().chars().nth(0) {
+                Some(x) => x,
+                None => {
+                    eprintln!("[!] Error: Please enter something!");
+                    return;
+                }
+            };
+
+            if choice == 'y' { dump.default.as_ref() } else { None }
+        }
+    };
+
+    if profile.is_none() {
+        return;
+    }
+
+    let password: String = rpassword::prompt_password(
+        format!("[+] Enter master password for `{}` profile: ", profile.unwrap())
+    ).unwrap();
+
+    let path = PASSWORDFILE.get().unwrap();
+
+    let new_records = data.iter()
+        .map(|rec| vault::Record::new(rec, &password))
+        .collect::<Vec<_>>();
+
+    let mut records = match vault::load(path, &password, profile) {
         Ok(y) => match y {
             Some(x) => x,
             None => {
-                println!("[$] 0 passwords found in local database");
                 Vec::new()
             }
         },
@@ -669,45 +726,20 @@ fn import_credentials_from_json(path: String, profile: Option<&String>) {
             if err.contains("[!] Error decrypting message") {
                 println!("[!] Incorrect Password");
                 log!(INVALID, "Incorrect Password");
-            } else {
-                println!("[!] Error: {err}");
             }
             return;
         }
     };
+    records.extend(new_records);
 
-    let foreign_passwd = rpassword::prompt_password(&format!("[+] Enter the password to {} file: ", path)).unwrap();
-
-    let foreign_records: Vec<vault::Record> = match vault::load(&path, &foreign_passwd, profile) {
-        Ok(y) => match y {
-            Some(x) => x,
-            None => {
-                println!("[!] 0 records were found in the foreign database!\nTry 'rustsafe --add' to create a new record");
-                return;
-            }
-        },
-        Err(err) => {
-            if err.contains("[!] Error decrypting message") {
-                println!("[!] Incorrect Password"); // no need to ban for foreign records
-            } else {
-                println!("[!] Error: {err}");
-            }
-            return;
-        }
-    };
-
-    for record in foreign_records {
-        records.push(record);
-    }
-
-    if let Err(err) = vault::dump(&records, PASSWORDFILE.get().unwrap(), &password, profile) {
-        eprintln!("[!] Error: {err}");
+    if let Err(_) = vault::dump(&records, path, &password, profile) {
+        eprintln!("[!] Error: while writting password to password file!");
         return;
     }
 
-    println!("[+] Passwords were imported successfully from {}", path);
-
-    log!(INFO, format!("Passwords were imported successfully from {}", path));
+    let query = format!("Passwords were imported successfully from {} into profile '{}'", path, profile.unwrap());
+    println!("[+] {}", query);
+    log!(INFO, query);
 }
 
 fn export_credentials_to_json() {
